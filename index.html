@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tools — Ant Davis</title>
+<title>Tools | Ant Davis</title>
 <meta name="description" content="Practical tools built by Ant Davis. Free, client-side, no accounts.">
 <style>
   @font-face {
@@ -145,98 +145,6 @@
     background: var(--line);
   }
 
-  .featured {
-    max-width: 1080px;
-    margin: 18px auto 0;
-    padding: 0 28px 8px;
-  }
-  .feature-card {
-    border: 2px solid var(--ink);
-    border-radius: 10px;
-    padding: 36px;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 28px;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .feature-card::before {
-    content: '';
-    position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 140px;
-    height: 140px;
-    background: var(--yellow);
-    border-radius: 50%;
-    opacity: 0.5;
-    z-index: 0;
-  }
-  .feature-mark {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--ink);
-    color: var(--yellow);
-    padding: 5px 10px;
-    border-radius: 4px;
-    z-index: 1;
-    white-space: nowrap;
-    align-self: start;
-  }
-  .feature-body { z-index: 1; }
-  .feature-body h2 {
-    font-family: 'Barber Chop', var(--sans);
-    font-size: 30px;
-    margin-bottom: 10px;
-  }
-  .feature-body p {
-    font-size: 15px;
-    line-height: 1.6;
-    color: var(--ink-soft);
-    max-width: 52ch;
-  }
-  .feature-status {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--grey);
-    margin-top: 12px;
-  }
-  .feature-status .live {
-    color: #2FA84F;
-    font-weight: 700;
-  }
-  .feature-cta {
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-  }
-  .btn {
-    font-family: var(--mono);
-    font-size: 13px;
-    background: var(--ink);
-    color: var(--yellow);
-    padding: 12px 20px;
-    border-radius: 6px;
-    white-space: nowrap;
-    border: 2px solid var(--ink);
-    transition: background 0.15s ease, color 0.15s ease;
-  }
-  .btn:hover { background: var(--yellow); color: var(--ink); }
-  .btn-secondary {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--ink-soft);
-    padding: 8px 14px;
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    white-space: nowrap;
-    transition: border-color 0.15s ease;
-  }
-  .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
-
   /* ---------- GRID ---------- */
   .grid {
     max-width: 1080px;
@@ -270,6 +178,23 @@
     font-family: 'Barber Chop', var(--sans);
     font-size: 21px;
     letter-spacing: 0.2px;
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .new-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--yellow);
+    color: var(--ink);
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    padding: 2px 6px;
+    line-height: 1.2;
   }
   .status-dot {
     display: flex;
@@ -341,11 +266,6 @@
 
   @media (max-width: 760px) {
     .grid { grid-template-columns: 1fr; }
-    .feature-card {
-      grid-template-columns: 1fr;
-      text-align: left;
-    }
-    .feature-cta { align-items: flex-start; }
     .bar-nav { gap: 16px; }
     .footer-inner { flex-direction: column; align-items: flex-start; }
   }
@@ -376,40 +296,49 @@
   <div class="runtime-note"><b>Runs client-side.</b> Nothing gets uploaded, nothing gets tracked. Not a pitch, just how I build.</div>
 </div>
 
-<div class="section-label">Featured</div>
-<div class="featured">
-  <div class="feature-card">
-    <div class="feature-mark">01 / FEATURED</div>
-    <div class="feature-body">
-      <h2>ExtRenew</h2>
-      <p>A recurring, 30-day permissions checkup for every other Chrome or Firefox extension you've got installed. Plain-English explanations, a rating for each one, and it never phones home. Everything stays on your machine.</p>
-      <div class="feature-status">STATUS: <span class="live">Live</span> — available on the Chrome Web Store and Firefox Add-ons</div>
-    </div>
-    <div class="feature-cta">
-      <a class="btn" href="https://extrenew.com">Visit ExtRenew.com →</a>
-    </div>
-  </div>
-
-  <div class="feature-card" style="margin-top:18px;">
-    <div class="feature-mark">02 / FEATURED</div>
-    <div class="feature-body">
-      <h2>PosterPrompt</h2>
-      <p>Tired of your AI-generated posters looking like every other piece of AI poster slop out there? Meet PosterPrompt. A poster prompt generator built to get you past the generic stuff, straight to prompts with actual style.</p>
-      <div class="feature-status">STATUS: <span class="live">Live</span></div>
-    </div>
-    <div class="feature-cta">
-      <a class="btn" href="https://antdaviscyber.github.io/SCH-Tools/posterprompt/">Open PosterPrompt →</a>
-    </div>
-  </div>
-</div>
-
-<div class="section-label" style="margin-top:56px;">Also built</div>
+<div class="section-label">All tools</div>
 <div class="grid">
 
   <div class="card">
     <div class="card-top">
+      <h3>Analog Toy</h3>
+      <div class="card-meta"><span class="new-tag">New</span><span class="status-dot">Live</span></div>
+    </div>
+    <p>Gives your photos that toy camera film look, right in the browser. A rebuild of a much-loved photo app that stopped being supported. No upload, no install.</p>
+    <a class="card-link" href="analogtoy/">Open Analog Toy <span class="arrow">→</span></a>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <h3>World Time Thing</h3>
+      <div class="card-meta"><span class="new-tag">New</span><span class="status-dot">Live</span></div>
+    </div>
+    <p>A time zone converter for working out what time it is everywhere that matters, without the mental arithmetic.</p>
+    <a class="card-link" href="worldtimething/">Open World Time Thing <span class="arrow">→</span></a>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <h3>ExtRenew</h3>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
+    </div>
+    <p>A recurring 30-day permissions checkup for your Chrome and Firefox extensions. Plain-English explanations, a rating for each one, and it never phones home.</p>
+    <a class="card-link" href="https://extrenew.com">Visit ExtRenew.com <span class="arrow">→</span></a>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
+      <h3>PosterPrompt</h3>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
+    </div>
+    <p>Tired of AI posters that all look the same? A poster prompt generator built to get past the generic stuff, straight to prompts with actual style.</p>
+    <a class="card-link" href="https://antdaviscyber.github.io/SCH-Tools/posterprompt/">Open PosterPrompt <span class="arrow">→</span></a>
+  </div>
+
+  <div class="card">
+    <div class="card-top">
       <h3>FrameGrab</h3>
-      <span class="status-dot">Live</span>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
     </div>
     <p>Pulls clean still frames out of video, right in the browser. No upload, no install.</p>
     <a class="card-link" href="https://antdaviscyber.github.io/SCH-Tools/FrameGrab/">Open FrameGrab <span class="arrow">→</span></a>
@@ -418,7 +347,7 @@
   <div class="card">
     <div class="card-top">
       <h3>AnyPNG</h3>
-      <span class="status-dot">Live</span>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
     </div>
     <p>Converts HEIC and other image formats to PNG, entirely in the browser. No upload required.</p>
     <a class="card-link" href="https://antdaviscyber.github.io/SCH-Tools/AnyPNG/">Open AnyPNG <span class="arrow">→</span></a>
@@ -427,7 +356,7 @@
   <div class="card">
     <div class="card-top">
       <h3>Audio Convert</h3>
-      <span class="status-dot">Live</span>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
     </div>
     <p>Converts m4a, aac, wav, ogg, and flac to MP3 or WAV, entirely on your machine.</p>
     <a class="card-link" href="https://antdaviscyber.github.io/SCH-Tools/audio-convert/">Open Audio Convert <span class="arrow">→</span></a>
@@ -436,7 +365,7 @@
   <div class="card">
     <div class="card-top">
       <h3>Capacity Calculator</h3>
-      <span class="status-dot">Live</span>
+      <div class="card-meta"><span class="status-dot">Live</span></div>
     </div>
     <p>Works out realistic security awareness capacity, whether you're running the programme solo or as a team. Built for the Secure Culture Hub.</p>
     <a class="card-link" href="https://secureculture.com">Open on secureculture.com <span class="arrow">→</span></a>
