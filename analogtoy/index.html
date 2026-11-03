@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analog Toy: toy camera, cross process and light leaks</title>
+<meta name="description" content="Free in-browser tool for toy camera and analog film looks: vignette, cross processing, light leaks, film strip frames. Nothing is uploaded.">
+<style>
+  :root { --bg:#16161a; --panel:#1e1e24; --line:#32323c; --text:#e8e6e1; --mute:#9b98a3; --accent:#ff8a3d; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font:14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .app { display:grid; grid-template-columns:1fr 330px; height:100vh; }
+  @media (max-width:800px){ .app{ grid-template-columns:1fr; grid-template-rows:55vh 1fr; height:auto; } }
+  .stage { position:relative; display:flex; align-items:center; justify-content:center; padding:20px; overflow:hidden; min-height:300px; }
+  .stage canvas { max-width:100%; max-height:calc(100vh - 40px); box-shadow:0 8px 40px rgba(0,0,0,.6); background:#000; }
+  @media (max-width:800px){ .stage canvas{ max-height:50vh; } }
+  .empty { text-align:center; color:var(--mute); border:2px dashed var(--line); border-radius:14px; padding:60px 40px; max-width:420px; }
+  .empty b { color:var(--text); font-size:18px; display:block; margin-bottom:8px; }
+  .stage.drag { outline:3px dashed var(--accent); outline-offset:-12px; }
+  .panel { background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:16px; }
+  h1 { font-size:16px; margin:0 0 12px; letter-spacing:.02em; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--mute); margin:18px 0 8px; }
+  .row { display:grid; grid-template-columns:96px 1fr 38px; align-items:center; gap:8px; margin:6px 0; }
+  .row label { color:var(--mute); }
+  .row output { text-align:right; font-variant-numeric:tabular-nums; color:var(--mute); font-size:12px; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  select { width:100%; background:#2a2a32; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px; }
+  .sel { display:grid; grid-template-columns:96px 1fr; gap:8px; align-items:center; margin:6px 0; }
+  .sel label { color:var(--mute); }
+  button { background:#2a2a32; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px 10px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#1a1006; border-color:var(--accent); font-weight:600; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips button { padding:5px 9px; font-size:12px; }
+  .chips button.on { border-color:var(--accent); color:var(--accent); }
+  .bar { display:flex; gap:8px; margin-top:14px; }
+  .bar button { flex:1; }
+  .mine { display:flex; gap:4px; margin:4px 0; }
+  .mine button:first-child { flex:1; text-align:left; }
+  .mine button.del { width:34px; padding:6px 0; color:var(--mute); }
+  .mine button.del:hover { color:#ff6b6b; border-color:#ff6b6b; }
+  .inl { display:flex; gap:6px; }
+  .inl input { flex:1; min-width:0; background:#2a2a32; color:inherit; border:1px solid var(--line); border-radius:6px; padding:6px; font:inherit; }
+  kbd { background:#2a2a32; border:1px solid var(--line); border-radius:4px; padding:0 5px; font-size:11px; color:var(--mute); }
+  .hint { color:var(--mute); font-size:12px; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage" id="stage">
+    <div class="empty" id="empty"><b>Drop a photo here</b>or click Open, or paste an image.<br>Everything runs in your browser. Nothing is uploaded.</div>
+    <canvas id="view" hidden></canvas>
+  </div>
+  <aside class="panel">
+    <h1>Analog Toy <a href="https://tools.antdavis.com/" style="float:right;font-size:12px;font-weight:400;color:var(--mute);text-decoration:none">All tools</a></h1>
+    <div class="bar" style="margin-top:0">
+      <button class="primary" id="open">Open photo</button>
+      <button id="compare" disabled>Hold to compare</button>
+    </div>
+    <div class="bar">
+      <button class="primary" id="rand" disabled>Randomise <kbd>R</kbd></button>
+      <button id="back" disabled>Back <kbd>B</kbd></button>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+
+    <h2>Presets</h2>
+    <div class="chips" id="presets"></div>
+
+    <div id="controls"></div>
+
+    <h2>Export</h2>
+    <div class="sel"><label>Format</label>
+      <select id="fmt"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option></select></div>
+    <div class="bar">
+      <button id="reset">Reset</button>
+      <button class="primary" id="save" disabled>Save image</button>
+    </div>
+    <div class="hint">Saves at full resolution (capped at 5000 px on the long edge).</div>
+
+    <h2>My presets</h2>
+    <div class="inl">
+      <input type="text" id="pname" placeholder="Name this look" maxlength="30">
+      <button id="psave">Save</button>
+    </div>
+    <div id="mine" style="margin-top:8px"></div>
+    <div class="bar">
+      <button id="pexp">Export</button>
+      <button id="pimp">Import</button>
+    </div>
+    <input type="file" id="pfile" accept=".json,application/json" hidden>
+    <div class="hint">Saved looks keep the effects, colour, leak and frame settings, not your crop or text. They are stored in this browser, so use Export to back them up.</div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- parameters ---------- */
+const DEFAULTS = {
+  softness:0, edgeBlur:0, vignette:0, vigSize:40,
+  brightness:0, contrast:100, saturation:100, warmth:0, fade:0, cross:0,
+  grain:0,
+  leak:"none", leakAmount:60, leakHue:20,
+  frame:"none", frameSize:45, frameText:"", aspect:"original", zoom:100, panX:0, panY:0
+};
+const CROPKEYS = ["aspect","zoom","panX","panY"];
+
+const PRESETS = {
+  "Original":      {},
+  "Toy Classic":   { softness:10, edgeBlur:45, vignette:60, vigSize:40, saturation:130, contrast:120, grain:25 },
+  "Cross Process": { cross:85, saturation:125, contrast:110, vignette:25, grain:15 },
+  "Lomo":          { contrast:135, saturation:145, vignette:75, vigSize:30, cross:35, grain:20, edgeBlur:15 },
+  "Faded Film":    { fade:55, saturation:85, contrast:90, warmth:20, grain:30, vignette:20 },
+  "Sunburn":       { leak:"left", leakAmount:70, leakHue:15, warmth:40, saturation:125, fade:20, vignette:35, grain:25, cross:20 },
+  "Cool Leak":     { leak:"corner", leakAmount:60, leakHue:190, cross:50, warmth:-30, fade:25, vignette:30, grain:20 },
+  "Polaroid":      { frame:"polaroid", aspect:"1:1", fade:30, warmth:25, saturation:90, vignette:25, grain:20 },
+  "Film Strip":    { frame:"film", frameSize:40, frameText:"", contrast:115, saturation:115, fade:15, grain:35, vignette:30, cross:20 },
+  "Dreamy":        { softness:55, edgeBlur:30, brightness:8, saturation:110, fade:30, leak:"top", leakAmount:40, leakHue:330, vignette:20, grain:10 }
+};
+
+const SLIDERS = [
+  ["Toy camera", [
+    ["softness","Softness",0,100,1],
+    ["edgeBlur","Edge blur",0,100,1],
+    ["vignette","Vignette",0,100,1],
+    ["vigSize","Vignette size",5,90,1]
+  ]],
+  ["Colour", [
+    ["brightness","Brightness",-50,50,1],
+    ["contrast","Contrast",50,170,1],
+    ["saturation","Saturation",0,200,1],
+    ["warmth","Warmth",-100,100,1],
+    ["fade","Fade",0,100,1],
+    ["cross","Cross process",0,100,1]
+  ]],
+  ["Texture", [
+    ["grain","Grain",0,100,1]
+  ]]
+];
+
+const ASPECTS = { "original":0, "1:1":1, "4:5":0.8, "3:4":0.75, "4:3":4/3, "3:2":1.5, "16:9":16/9 };
+
+let params = { ...DEFAULTS };
+let img = null;
+const ui = {};
+
+/* ---------- image processing ---------- */
+function blurH(s,t,W,H,r){
+  const k = 2*r+1;
+  for (let y=0; y<H; y++){
+    const row = y*W*4;
+    for (let c=0; c<3; c++){
+      let sum = 0;
+      for (let i=-r; i<=r; i++){ const x = i<0?0:(i>W-1?W-1:i); sum += s[row+x*4+c]; }
+      for (let x=0; x<W; x++){
+        t[row+x*4+c] = sum/k;
+        const xa = x+r+1>W-1?W-1:x+r+1, xr = x-r<0?0:x-r;
+        sum += s[row+xa*4+c] - s[row+xr*4+c];
+      }
+    }
+    for (let x=0; x<W; x++) t[row+x*4+3] = 255;
+  }
+}
+function blurV(s,t,W,H,r){
+  const k = 2*r+1, st = W*4;
+  for (let x=0; x<W; x++){
+    for (let c=0; c<3; c++){
+      const col = x*4+c;
+      let sum = 0;
+      for (let i=-r; i<=r; i++){ const y = i<0?0:(i>H-1?H-1:i); sum += s[y*st+col]; }
+      for (let y=0; y<H; y++){
+        t[y*st+col] = sum/k;
+        const ya = y+r+1>H-1?H-1:y+r+1, yr = y-r<0?0:y-r;
+        sum += s[ya*st+col] - s[yr*st+col];
+      }
+    }
+  }
+  for (let y=0; y<H; y++) for (let x=0; x<W; x++) t[y*st+x*4+3] = 255;
+}
+function boxBlur(src,W,H,r,passes){
+  const a = new Uint8ClampedArray(src), b = new Uint8ClampedArray(src.length);
+  for (let n=0; n<passes; n++){ blurH(a,b,W,H,r); blurV(b,a,W,H,r); }
+  return a;
+}
+
+function smooth(e0,e1,x){ let t=(x-e0)/(e1-e0); t = t<0?0:t>1?1:t; return t*t*(3-2*t); }
+const ss = x => x*x*(3-2*x);
+const cl = v => v<0?0:v>255?255:v;
+
+function buildCurves(amount){
+  const lr = new Uint8ClampedArray(256), lg = new Uint8ClampedArray(256), lb = new Uint8ClampedArray(256);
+  for (let i=0; i<256; i++){
+    const x = i/255;
+    // red: strong S curve, green: gentle S with a small lift, blue: low contrast, lifted shadows, dimmed highlights
+    const r = x + 1.8*(ss(x)-x);
+    const g = (x + 0.9*(ss(x)-x))*0.94 + 0.03;
+    const b = 0.12 + 0.72*(x - 0.4*(ss(x)-x));
+    lr[i] = 255*(x + amount*(Math.min(1,Math.max(0,r)) - x));
+    lg[i] = 255*(x + amount*(Math.min(1,Math.max(0,g)) - x));
+    lb[i] = 255*(x + amount*(Math.min(1,Math.max(0,b)) - x));
+  }
+  return [lr,lg,lb];
+}
+
+function drawLeak(ctx,W,H,type,amount,hue){
+  if (type === "none") return;
+  const a = amount/100;
+  const col = (h,al,l) => `hsla(${h},100%,${l}%,${al})`;
+  const stops = g => {
+    g.addColorStop(0,   col(hue,      0.95*a, 55));
+    g.addColorStop(0.4, col(hue+30,   0.50*a, 60));
+    g.addColorStop(1,   col(hue+55,   0,      60));
+    return g;
+  };
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  let g;
+  switch (type){
+    case "left":   g = stops(ctx.createLinearGradient(0,0,W*0.55,0)); break;
+    case "right":  g = stops(ctx.createLinearGradient(W,0,W*0.45,0)); break;
+    case "top":    g = stops(ctx.createLinearGradient(0,0,0,H*0.55)); break;
+    case "bottom": g = stops(ctx.createLinearGradient(0,H,0,H*0.45)); break;
+    case "corner": g = stops(ctx.createRadialGradient(W*0.04,H*0.04,0,W*0.04,H*0.04,Math.max(W,H)*0.75)); break;
+    case "corner2":g = stops(ctx.createRadialGradient(W*0.96,H*0.96,0,W*0.96,H*0.96,Math.max(W,H)*0.75)); break;
+    case "streak": {
+      ctx.translate(W/2,H/2); ctx.rotate(0.5);
+      const L = Math.hypot(W,H);
+      g = ctx.createLinearGradient(-L*0.12,0,L*0.12,0);
+      g.addColorStop(0,   col(hue+40,0,60));
+      g.addColorStop(0.5, col(hue,0.85*a,58));
+      g.addColorStop(1,   col(hue+40,0,60));
+      ctx.fillStyle = g; ctx.fillRect(-L,-L,2*L,2*L);
+      ctx.restore(); return;
+    }
+  }
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+function drawFrame(ctx,W,H,p){
+  const type = p.frame;
+  if (type === "none") return;
+  const m = Math.min(W,H);
+  const bw = Math.max(2, Math.round(m*p.frameSize/1000));
+  const text = (p.frameText || "").trim();
+  ctx.save();
+
+  if (type === "film"){
+    // 35mm strip: black bands top and bottom with sprocket holes and edge printing
+    const band = Math.round(bw*2.2), side = Math.max(2, Math.round(bw*0.35));
+    ctx.fillStyle = "#0b0b0c";
+    ctx.fillRect(0,0,W,band);
+    ctx.fillRect(0,H-band,W,band);
+    ctx.fillRect(0,0,side,H);
+    ctx.fillRect(W-side,0,side,H);
+
+    const hw = band*0.34, hh = band*0.24, pitch = band*0.62, r = hh*0.28;
+    const holeY1 = band*0.10, holeY2 = H-band*0.10-hh;
+    ctx.fillStyle = "#e9e4d6";
+    for (let x = pitch*0.5; x < W; x += pitch){
+      for (const y of [holeY1, holeY2]){
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x,y,hw,hh,r); else ctx.rect(x,y,hw,hh);
+        ctx.fill();
+      }
+    }
+
+    const fs = Math.max(6, band*0.24);
+    ctx.font = "bold " + fs + "px 'Courier New', monospace";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(247,166,45,0.92)";
+    const base = text ? text.toUpperCase() : "SAFETY FILM 400";
+    let n = 1, x = band*0.3;
+    const yTop = band*0.62, yBot = H - band*0.62;
+    while (x < W){
+      const label = base + "   \u25B6 " + n + "   " + n + "A   ";
+      ctx.fillText(label, x, yTop);
+      ctx.fillText(label, x, yBot);
+      x += ctx.measureText(label).width + fs*1.2;
+      n++;
+    }
+    ctx.restore();
+    return;
+  }
+
+  const bottom = type === "polaroid" ? Math.round(bw*3.4) : bw;
+  const dark = type === "black";
+  ctx.fillStyle = dark ? "#0a0a0a" : "#f3eee4";
+  ctx.fillRect(0,0,W,bw);
+  ctx.fillRect(0,H-bottom,W,bottom);
+  ctx.fillRect(0,0,bw,H);
+  ctx.fillRect(W-bw,0,bw,H);
+
+  if (text){
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (type === "polaroid"){
+      ctx.fillStyle = "#2b2622";
+      const fs = Math.max(8, bottom*0.34);
+      ctx.font = fs + "px 'Segoe Print','Bradley Hand','Comic Sans MS',cursive";
+      ctx.fillText(text, W/2, H - bottom*0.45, W - bw*2);
+    } else {
+      ctx.fillStyle = dark ? "#cfcac0" : "#4a443c";
+      const fs = Math.max(6, bw*0.5);
+      ctx.font = fs + "px system-ui, sans-serif";
+      ctx.fillText(text, W/2, H - bw/2, W - bw*2);
+    }
+  }
+  ctx.restore();
+}
+
+function cropInfo(source,p){
+  const iw = source.naturalWidth || source.width, ih = source.naturalHeight || source.height;
+  let sw = iw, sh = ih;
+  const ar = ASPECTS[p.aspect];
+  if (ar){
+    if (iw/ih > ar){ sw = ih*ar; sh = ih; } else { sw = iw; sh = iw/ar; }
+  }
+  const z = Math.max(1, p.zoom/100);
+  sw /= z; sh /= z;
+  const sx = (iw-sw)*(0.5 + p.panX/200), sy = (ih-sh)*(0.5 + p.panY/200);
+  return { iw, ih, sw, sh, sx, sy };
+}
+
+function render(source, canvas, maxDim, p){
+  const c = cropInfo(source,p);
+  const sw = c.sw, sh = c.sh, sx = c.sx, sy = c.sy;
+  const scale = Math.min(1, maxDim/Math.max(sw,sh));
+  const W = Math.max(1,Math.round(sw*scale)), H = Math.max(1,Math.round(sh*scale));
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently:true });
+  ctx.drawImage(source, sx,sy,sw,sh, 0,0,W,H);
+
+  const id = ctx.getImageData(0,0,W,H), d = id.data;
+
+  const soft = p.softness/100, edge = p.edgeBlur/100;
+  let bl = null;
+  if (soft > 0 || edge > 0){
+    const r = Math.max(1, Math.round(Math.max(W,H)*(0.004 + 0.014*Math.max(soft,edge))));
+    bl = boxBlur(d,W,H,r,3);
+  }
+
+  const [lr,lg,lb] = buildCurves(p.cross/100);
+  const useCurves = p.cross > 0;
+  const con = p.contrast/100, bri = p.brightness/100*255, warm = p.warmth/100*28;
+  const sat = p.saturation/100, fade = p.fade/100;
+  const vs = p.vignette/100, vsize = p.vigSize/100;
+  const grain = p.grain/100*70;
+  const cx = W/2, cy = H/2, maxd = Math.hypot(cx,cy);
+
+  let s = 2463534242 >>> 0;
+  const rnd = () => { s ^= s<<13; s >>>= 0; s ^= s>>>17; s ^= s<<5; s >>>= 0; return s/4294967296; };
+
+  let i = 0;
+  for (let y=0; y<H; y++){
+    const dy = y-cy;
+    for (let x=0; x<W; x++, i+=4){
+      const dx = x-cx;
+      const dist = Math.sqrt(dx*dx+dy*dy)/maxd;
+      let r = d[i], g = d[i+1], b = d[i+2];
+
+      if (bl){
+        let m = soft*0.85 + edge*smooth(0.3,1,dist);
+        if (m > 1) m = 1;
+        r += (bl[i]-r)*m; g += (bl[i+1]-g)*m; b += (bl[i+2]-b)*m;
+      }
+
+      r = cl((r-128)*con+128+bri);
+      g = cl((g-128)*con+128+bri);
+      b = cl((b-128)*con+128+bri);
+
+      if (useCurves){ r = lr[r|0]; g = lg[g|0]; b = lb[b|0]; }
+
+      r += warm; b -= warm;
+
+      const l = 0.299*r + 0.587*g + 0.114*b;
+      r = l + (r-l)*sat; g = l + (g-l)*sat; b = l + (b-l)*sat;
+
+      if (fade > 0){
+        const k = 1 - fade*0.16, lift = fade*40;
+        r = r*k + lift; g = g*k + lift*1.05; b = b*k + lift*1.1;
+      }
+
+      if (vs > 0){
+        const v = smooth(vsize, 1, dist);
+        const f = 1 - vs*v;
+        r *= f; g *= f; b *= f;
+      }
+
+      if (grain > 0){
+        const mid = 1 - Math.min(0.65, Math.abs(l-128)/190);
+        const n = (rnd()-0.5)*grain*mid;
+        r += n; g += n; b += n;
+      }
+
+      d[i] = cl(r); d[i+1] = cl(g); d[i+2] = cl(b); d[i+3] = 255;
+    }
+  }
+  ctx.putImageData(id,0,0);
+
+  drawLeak(ctx,W,H,p.leak,p.leakAmount,p.leakHue);
+  drawFrame(ctx,W,H,p);
+}
+
+/* ---------- UI ---------- */
+const view = document.getElementById("view");
+const stage = document.getElementById("stage");
+const empty = document.getElementById("empty");
+const cmpBtn = document.getElementById("compare");
+const saveBtn = document.getElementById("save");
+let pending = false, comparing = false;
+
+function schedule(){
+  if (pending || !img) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const p = comparing ? { ...DEFAULTS, aspect:params.aspect, zoom:params.zoom, panX:params.panX, panY:params.panY } : params;
+    render(img, view, 1400, p);
+  });
+}
+
+function addRow(parent,key,label,min,max,step){
+  const row = document.createElement("div"); row.className = "row";
+  const lab = document.createElement("label"); lab.textContent = label;
+  const inp = document.createElement("input"); inp.type = "range"; inp.min = min; inp.max = max; inp.step = step;
+  const out = document.createElement("output");
+  inp.addEventListener("input", () => { params[key] = +inp.value; out.textContent = inp.value; if (!CROPKEYS.includes(key)) clearPresetHighlight(); schedule(); updateCursor(); });
+  row.append(lab,inp,out); parent.appendChild(row);
+  ui[key] = { inp, out };
+}
+function addSelect(parent,key,label,options){
+  const wrap = document.createElement("div"); wrap.className = "sel";
+  const lab = document.createElement("label"); lab.textContent = label;
+  const sel = document.createElement("select");
+  for (const [v,t] of options){ const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); }
+  sel.addEventListener("change", () => { params[key] = sel.value; if (!CROPKEYS.includes(key)) clearPresetHighlight(); schedule(); updateCursor(); });
+  wrap.append(lab,sel); parent.appendChild(wrap);
+  ui[key] = { sel };
+}
+
+function addText(parent,key,label,placeholder){
+  const wrap = document.createElement("div"); wrap.className = "sel";
+  const lab = document.createElement("label"); lab.textContent = label;
+  const t = document.createElement("input"); t.type = "text"; t.placeholder = placeholder; t.maxLength = 60;
+  t.style.cssText = "width:100%;background:#2a2a32;color:inherit;border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit";
+  t.addEventListener("input", () => { params[key] = t.value; clearPresetHighlight(); schedule(); });
+  wrap.append(lab,t); parent.appendChild(wrap);
+  ui[key] = { txt:t };
+}
+
+const controls = document.getElementById("controls");
+for (const [title, items] of SLIDERS){
+  const h = document.createElement("h2"); h.textContent = title; controls.appendChild(h);
+  for (const it of items) addRow(controls, ...it);
+}
+{
+  const h = document.createElement("h2"); h.textContent = "Light leak"; controls.appendChild(h);
+  addSelect(controls,"leak","Type",[["none","None"],["left","Left edge"],["right","Right edge"],["top","Top edge"],["bottom","Bottom edge"],["corner","Top left corner"],["corner2","Bottom right corner"],["streak","Streak"]]);
+  addRow(controls,"leakAmount","Strength",0,100,1);
+  addRow(controls,"leakHue","Hue",0,360,1);
+  const h2 = document.createElement("h2"); h2.textContent = "Finish"; controls.appendChild(h2);
+  addSelect(controls,"frame","Frame",[["none","None"],["white","White border"],["black","Black border"],["polaroid","Polaroid"],["film","Film strip"]]);
+  addRow(controls,"frameSize","Thickness",5,150,1);
+  addText(controls,"frameText","Frame text","Caption or film text");
+  addSelect(controls,"aspect","Crop",Object.keys(ASPECTS).map(k => [k, k === "original" ? "Original" : k]));
+  addRow(controls,"zoom","Zoom",100,400,1);
+  addRow(controls,"panX","Position X",-100,100,1);
+  addRow(controls,"panY","Position Y",-100,100,1);
+  const ph = document.createElement("div"); ph.className = "hint";
+  ph.textContent = "You can also drag the photo to reposition it inside the crop.";
+  controls.appendChild(ph);
+}
+
+function syncUI(){
+  for (const k in params){
+    const u = ui[k]; if (!u) continue;
+    if (u.inp){ u.inp.value = params[k]; u.out.textContent = params[k]; }
+    else if (u.txt) u.txt.value = params[k];
+    else u.sel.value = params[k];
+  }
+}
+
+const presetBox = document.getElementById("presets");
+function clearPresetHighlight(){ for (const b of presetBox.children) b.classList.remove("on"); }
+for (const name of Object.keys(PRESETS)){
+  const b = document.createElement("button"); b.textContent = name;
+  b.addEventListener("click", () => {
+    if (img) pushHistory();
+    params = { ...DEFAULTS, aspect:params.aspect, zoom:params.zoom, panX:params.panX, panY:params.panY, frameText:params.frameText, ...PRESETS[name] };
+    syncUI(); clearPresetHighlight(); b.classList.add("on"); schedule();
+  });
+  presetBox.appendChild(b);
+}
+
+document.getElementById("reset").addEventListener("click", () => {
+  params = { ...DEFAULTS }; syncUI(); clearPresetHighlight(); schedule();
+});
+
+/* history, randomise, saved presets */
+const LOOK_KEYS = Object.keys(DEFAULTS).filter(k => !CROPKEYS.includes(k) && k !== "frameText");
+const history = [];
+function pushHistory(){
+  history.push(JSON.stringify(params));
+  if (history.length > 40) history.shift();
+  document.getElementById("back").disabled = !img;
+}
+function applyLook(look){
+  params = { ...DEFAULTS, aspect:params.aspect, zoom:params.zoom, panX:params.panX, panY:params.panY, frameText:params.frameText, ...look };
+  syncUI(); schedule(); updateCursor();
+}
+const rr = (a,b) => a + Math.random()*(b-a);
+const ri = (a,b) => Math.round(rr(a,b));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+function randomise(){
+  if (!img) return;
+  pushHistory();
+  const hot = Math.random() < 0.6;
+  const look = {
+    softness: Math.random()<0.6 ? ri(0,30) : ri(30,70),
+    edgeBlur: ri(0,70),
+    vignette: ri(0,85),
+    vigSize: ri(15,60),
+    brightness: ri(-10,12),
+    contrast: ri(85,140),
+    saturation: ri(70,150),
+    warmth: ri(-50,50),
+    fade: Math.random()<0.5 ? 0 : ri(10,60),
+    cross: Math.random()<0.5 ? 0 : ri(20,90),
+    grain: ri(0,60),
+    leak: Math.random()<0.5 ? "none" : pick(["left","right","top","bottom","corner","corner2","streak"]),
+    leakAmount: ri(30,85),
+    leakHue: hot ? ri(0,60) : ri(0,360),
+    frame: Math.random()<0.55 ? "none" : pick(["white","black","polaroid","film"]),
+    frameSize: ri(25,80)
+  };
+  applyLook(look);
+  clearPresetHighlight();
+}
+function goBack(){
+  if (!history.length) return;
+  const prev = JSON.parse(history.pop());
+  const look = {}; for (const k of LOOK_KEYS) look[k] = prev[k];
+  applyLook(look); clearPresetHighlight();
+  document.getElementById("back").disabled = history.length === 0;
+}
+document.getElementById("rand").addEventListener("click", randomise);
+document.getElementById("back").addEventListener("click", goBack);
+window.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t && t.tagName === "INPUT" && t.type === "text") return;
+  if (e.key === "r" || e.key === "R"){ e.preventDefault(); randomise(); }
+  else if (e.key === "b" || e.key === "B"){ e.preventDefault(); goBack(); }
+});
+
+const STORE = "analogToyPresets";
+let saved = [];
+try { saved = JSON.parse(localStorage.getItem(STORE) || "[]"); if (!Array.isArray(saved)) saved = []; } catch(e){ saved = []; }
+function persist(){ try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch(e){} }
+const mine = document.getElementById("mine");
+function drawMine(){
+  mine.innerHTML = "";
+  if (!saved.length){ const h = document.createElement("div"); h.className = "hint"; h.textContent = "Nothing saved yet."; mine.appendChild(h); return; }
+  saved.forEach((it,idx) => {
+    const row = document.createElement("div"); row.className = "mine";
+    const b = document.createElement("button"); b.textContent = it.name;
+    b.addEventListener("click", () => { if (!img) { applyLook(it.look); return; } pushHistory(); applyLook(it.look); clearPresetHighlight(); });
+    const x = document.createElement("button"); x.className = "del"; x.textContent = "×"; x.title = "Delete";
+    x.addEventListener("click", () => { saved.splice(idx,1); persist(); drawMine(); });
+    row.append(b,x); mine.appendChild(row);
+  });
+}
+document.getElementById("psave").addEventListener("click", () => {
+  const nameEl = document.getElementById("pname");
+  let name = nameEl.value.trim() || ("Look " + (saved.length+1));
+  const look = {}; for (const k of LOOK_KEYS) look[k] = params[k];
+  const i = saved.findIndex(s => s.name === name);
+  if (i >= 0) saved[i] = { name, look }; else saved.push({ name, look });
+  persist(); drawMine(); nameEl.value = "";
+});
+document.getElementById("pname").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("psave").click(); });
+document.getElementById("pexp").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(saved,null,2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "analog-toy-presets.json"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+const pfile = document.getElementById("pfile");
+document.getElementById("pimp").addEventListener("click", () => pfile.click());
+pfile.addEventListener("change", () => {
+  const f = pfile.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const arr = JSON.parse(rd.result);
+      if (!Array.isArray(arr)) throw 0;
+      for (const it of arr){
+        if (!it || typeof it.name !== "string" || typeof it.look !== "object") continue;
+        const look = {}; for (const k of LOOK_KEYS) if (k in it.look) look[k] = it.look[k];
+        const i = saved.findIndex(s => s.name === it.name);
+        if (i >= 0) saved[i] = { name:it.name, look }; else saved.push({ name:it.name, look });
+      }
+      persist(); drawMine();
+    } catch(e){ alert("That file is not a valid presets file."); }
+    pfile.value = "";
+  };
+  rd.readAsText(f);
+});
+drawMine();
+
+/* compare */
+const down = () => { if (!img) return; comparing = true; schedule(); };
+const up   = () => { comparing = false; schedule(); };
+cmpBtn.addEventListener("mousedown", down);
+cmpBtn.addEventListener("touchstart", e => { e.preventDefault(); down(); }, { passive:false });
+window.addEventListener("mouseup", up);
+window.addEventListener("touchend", up);
+
+/* drag to reposition inside the crop */
+function canPan(){
+  if (!img) return false;
+  const c = cropInfo(img, params);
+  return (c.iw - c.sw) > 0.5 || (c.ih - c.sh) > 0.5;
+}
+function updateCursor(){ view.style.cursor = canPan() ? "grab" : "default"; }
+let drag = null;
+view.style.touchAction = "none";
+view.addEventListener("pointerdown", e => {
+  if (!canPan()) return;
+  view.setPointerCapture(e.pointerId);
+  drag = { x:e.clientX, y:e.clientY, px:params.panX, py:params.panY };
+  view.style.cursor = "grabbing";
+});
+view.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const c = cropInfo(img, params);
+  const r = view.getBoundingClientRect();
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  const freeX = c.iw - c.sw, freeY = c.ih - c.sh;
+  // dragging right moves the photo right, so the crop window moves left
+  if (freeX > 0.5) params.panX = Math.max(-100, Math.min(100, drag.px - (dx/r.width*c.sw)/freeX*200));
+  if (freeY > 0.5) params.panY = Math.max(-100, Math.min(100, drag.py - (dy/r.height*c.sh)/freeY*200));
+  syncUI(); schedule();
+});
+const endDrag = () => { drag = null; updateCursor(); };
+view.addEventListener("pointerup", endDrag);
+view.addEventListener("pointercancel", endDrag);
+
+/* loading */
+function loadFile(file){
+  if (!file || !file.type.startsWith("image/")) return;
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = () => {
+    img = im;
+    empty.hidden = true; view.hidden = false;
+    cmpBtn.disabled = false; saveBtn.disabled = false; document.getElementById("rand").disabled = false;
+    if (!document.querySelector("#presets .on")){
+      params = { ...DEFAULTS, aspect:params.aspect, zoom:100, panX:0, panY:0, frameText:params.frameText, ...PRESETS["Toy Classic"] };
+      syncUI(); presetBox.children[1].classList.add("on");
+    }
+    schedule(); updateCursor();
+  };
+  im.onerror = () => alert("Could not read that image.");
+  im.src = url;
+}
+const fileInput = document.getElementById("file");
+document.getElementById("open").addEventListener("click", () => fileInput.click());
+empty.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => loadFile(fileInput.files[0]));
+stage.addEventListener("dragover", e => { e.preventDefault(); stage.classList.add("drag"); });
+stage.addEventListener("dragleave", () => stage.classList.remove("drag"));
+stage.addEventListener("drop", e => { e.preventDefault(); stage.classList.remove("drag"); loadFile(e.dataTransfer.files[0]); });
+window.addEventListener("paste", e => {
+  for (const it of e.clipboardData.items) if (it.type.startsWith("image/")) { loadFile(it.getAsFile()); break; }
+});
+
+/* export */
+saveBtn.addEventListener("click", () => {
+  if (!img) return;
+  const out = document.createElement("canvas");
+  render(img, out, 5000, params);
+  const type = document.getElementById("fmt").value;
+  out.toBlob(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "analog-toy." + (type === "image/png" ? "png" : "jpg");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, type, 0.93);
+});
+
+syncUI();
+</script>
+</body>
+</html>
