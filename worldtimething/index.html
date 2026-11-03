@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Zone Converter</title>
+<style>
+  :root{
+    --bg:#f5f4f0; --card:#ffffff; --ink:#1b1b1f; --muted:#6b6b76; --line:#e2e0d9;
+    --accent:#2d5bff; --accent-ink:#ffffff; --src:#eaf0ff; --src-line:#b8c9ff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121316; --card:#1b1c21; --ink:#f0f0f3; --muted:#9a9aa6; --line:#2c2d34;
+      --accent:#6c8cff; --accent-ink:#0b0c10; --src:#1e2745; --src-line:#3a4c8f;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:960px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:1.6rem;margin:0 0 4px;letter-spacing:-0.01em}
+  .sub{color:var(--muted);margin:0 0 24px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:14px;
+    grid-template-columns:1.1fr 1fr 1.4fr auto;align-items:end}
+  @media (max-width:760px){.panel{grid-template-columns:1fr 1fr}.panel .wide{grid-column:1/-1}}
+  label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  input,select,button{font:inherit;color:inherit}
+  input,select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  #time{font-size:1.25rem;font-weight:600}
+  #time.bad{border-color:#d33}
+  .btn{padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}
+  .row .spacer{flex:1}
+  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem;cursor:pointer}
+  .toggle input{width:auto}
+  .hint{color:var(--muted);font-size:.85rem;margin:6px 0 0}
+  .err{color:#d33;font-size:.9rem;min-height:1.2em;margin:8px 0 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .zone{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative}
+  .zone.src{background:var(--src);border-color:var(--src-line)}
+  .zone .name{font-weight:600}
+  .zone .abbr{color:var(--muted);font-size:.85rem}
+  .zone .t{font-size:2rem;font-weight:700;letter-spacing:-0.02em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+  .zone .d{color:var(--muted);font-size:.9rem}
+  .tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:99px;font-size:.75rem;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+  .tag.src{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1}
+  .x:hover{color:#d33}
+  .add{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+  .add select{max-width:380px}
+  footer{margin-top:28px;color:var(--muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+  <h1>Time Zone Converter</h1>
+  <p class="sub">Type a time, pick the zone it is in, and see it everywhere else. Daylight saving is handled for the chosen date.</p>
+
+  <section class="panel" aria-label="Input">
+    <div>
+      <label for="time">Time</label>
+      <input id="time" type="text" value="9:00am" autocomplete="off" inputmode="text" spellcheck="false" aria-describedby="hint">
+    </div>
+    <div>
+      <label for="date">Date</label>
+      <input id="date" type="date">
+    </div>
+    <div class="wide">
+      <label for="src">In this time zone</label>
+      <select id="src"></select>
+    </div>
+    <div>
+      <button class="btn" id="now" type="button">Now</button>
+    </div>
+  </section>
+  <p class="hint" id="hint">Try: 9am, 9:30 pm, 14:00, 1430, noon, midnight.</p>
+  <p class="err" id="err" role="alert"></p>
+
+  <div class="row">
+    <label class="toggle"><input type="checkbox" id="h24"> 24 hour clock</label>
+    <span class="spacer"></span>
+    <button class="btn" id="copy" type="button">Copy as text</button>
+    <button class="btn" id="reset" type="button">Reset zones</button>
+  </div>
+
+  <section class="grid" id="grid" aria-live="polite"></section>
+
+  <div class="add">
+    <select id="addSel" aria-label="Add a time zone"></select>
+    <button class="btn primary" id="addBtn" type="button">Add zone</button>
+  </div>
+
+  <footer>Uses your browser's built in time zone data, so results stay correct across clock changes.</footer>
+</main>
+
+<script>
+(function(){
+  // Core zones. Labels are what you see; ids are IANA names.
+  var CORE = [
+    {id:'UTC',                 label:'GMT / UTC'},
+    {id:'Europe/London',       label:'UK (London)'},
+    {id:'America/New_York',    label:'Eastern (US)'},
+    {id:'America/Chicago',     label:'Central (US)'},
+    {id:'America/Denver',      label:'Mountain (US)'},
+    {id:'America/Los_Angeles', label:'Pacific (US)'},
+    {id:'Europe/Paris',        label:'Central Europe'},
+    {id:'Asia/Dubai',          label:'Dubai'},
+    {id:'Asia/Kolkata',        label:'India'},
+    {id:'Asia/Singapore',      label:'Singapore'},
+    {id:'Asia/Tokyo',          label:'Tokyo'},
+    {id:'Australia/Sydney',    label:'Sydney'},
+    {id:'Pacific/Auckland',    label:'Auckland'}
+  ];
+  var DEFAULT_ACTIVE = CORE.map(function(z){return z.id;});
+
+  var $ = function(id){return document.getElementById(id);};
+  var timeEl=$('time'), dateEl=$('date'), srcEl=$('src'), errEl=$('err'), gridEl=$('grid'),
+      h24El=$('h24'), addSel=$('addSel');
+
+  var state = {active: DEFAULT_ACTIVE.slice(), src:'UTC', h24:false};
+
+  function load(){
+    try{
+      var s = JSON.parse(localStorage.getItem('tzconv') || 'null');
+      if(s){
+        if(Array.isArray(s.active) && s.active.length) state.active = s.active;
+        if(s.src) state.src = s.src;
+        if(typeof s.h24 === 'boolean') state.h24 = s.h24;
+      }
+    }catch(e){}
+  }
+  function save(){
+    try{ localStorage.setItem('tzconv', JSON.stringify(state)); }catch(e){}
+  }
+
+  function labelFor(id){
+    for(var i=0;i<CORE.length;i++){ if(CORE[i].id===id) return CORE[i].label; }
+    return id.replace(/_/g,' ').replace('/', ' / ');
+  }
+
+  function allZones(){
+    var list = [];
+    try{ if(Intl.supportedValuesOf) list = Intl.supportedValuesOf('timeZone'); }catch(e){}
+    if(!list.length) list = CORE.map(function(z){return z.id;});
+    return list;
+  }
+
+  // ---- time maths ----
+  var fmtCache = {};
+  function dtf(tz){
+    if(!fmtCache[tz]){
+      fmtCache[tz] = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz, hourCycle:'h23', year:'numeric', month:'numeric', day:'numeric',
+        hour:'numeric', minute:'numeric', second:'numeric'
+      });
+    }
+    return fmtCache[tz];
+  }
+  function partsAt(tz, utcMs){
+    var o = {};
+    dtf(tz).formatToParts(new Date(utcMs)).forEach(function(p){ if(p.type!=='literal') o[p.type] = parseInt(p.value,10); });
+    return o;
+  }
+  function offsetMs(tz, utcMs){
+    var p = partsAt(tz, utcMs);
+    var asUtc = Date.UTC(p.year, p.month-1, p.day, p.hour % 24, p.minute, p.second);
+    return asUtc - Math.floor(utcMs/1000)*1000;
+  }
+  function zonedToUtc(tz, y, m, d, h, mi){
+    var guess = Date.UTC(y, m-1, d, h, mi);
+    var off = offsetMs(tz, guess);
+    var utc = guess - off;
+    var off2 = offsetMs(tz, utc);
+    if(off2 !== off) utc = guess - off2;
+    return utc;
+  }
+
+  function parseTime(raw){
+    var s = raw.trim().toLowerCase().replace(/\./g,'').replace(/\s+/g,' ');
+    if(s==='noon') return [12,0];
+    if(s==='midnight') return [0,0];
+    var m = s.match(/^(\d{1,2})(?:[:h]?(\d{2}))?\s*(am|pm|a|p)?$/);
+    if(!m) return null;
+    var h = parseInt(m[1],10), mi = m[2] ? parseInt(m[2],10) : 0, ap = m[3];
+    if(mi > 59) return null;
+    if(ap){
+      if(h < 1 || h > 12) return null;
+      var pm = ap.charAt(0) === 'p';
+      if(h === 12) h = pm ? 12 : 0; else if(pm) h += 12;
+    }else if(h > 23){
+      return null;
+    }
+    return [h, mi];
+  }
+
+  function abbrAt(tz, utcMs){
+    var found = [];
+    ['en-US','en-GB'].forEach(function(loc){
+      try{
+        var parts = new Intl.DateTimeFormat(loc, {timeZone:tz, timeZoneName:'short'}).formatToParts(new Date(utcMs));
+        for(var i=0;i<parts.length;i++){ if(parts[i].type==='timeZoneName') found.push(parts[i].value); }
+      }catch(e){}
+    });
+    for(var j=0;j<found.length;j++){ if(!/^(GMT|UTC)[+-]/.test(found[j])) return found[j]; }
+    return found[0] || '';
+  }
+
+  function fmtTime(tz, utcMs, h24){
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz, hour:'numeric', minute:'2-digit', hour12: !h24
+    }).format(new Date(utcMs)).replace(/\b(am|pm)\b/i, function(x){return x.toUpperCase();});
+  }
+  function fmtDate(tz, utcMs){
+    return new Intl.DateTimeFormat('en-GB', {timeZone: tz, weekday:'short', day:'numeric', month:'short'}).format(new Date(utcMs));
+  }
+  function dayNum(tz, utcMs){
+    var p = partsAt(tz, utcMs);
+    return Math.round(Date.UTC(p.year, p.month-1, p.day) / 864e5);
+  }
+
+  // ---- render ----
+  var lastText = '';
+  function render(){
+    var t = parseTime(timeEl.value);
+    timeEl.classList.toggle('bad', !t);
+    gridEl.innerHTML = '';
+    if(!t){ errEl.textContent = 'Could not read that time. Try 9am, 14:30 or noon.'; lastText=''; return; }
+    if(!dateEl.value){ errEl.textContent = 'Pick a date.'; lastText=''; return; }
+    errEl.textContent = '';
+
+    var dp = dateEl.value.split('-').map(Number);
+    var utc = zonedToUtc(state.src, dp[0], dp[1], dp[2], t[0], t[1]);
+    var srcDay = dayNum(state.src, utc);
+
+    // sanity: DST gap check
+    var chk = partsAt(state.src, utc);
+    if(chk.hour !== t[0] || chk.minute !== t[1]){
+      errEl.textContent = 'That local time does not exist on this date in ' + labelFor(state.src) + ' (clocks change). Showing the nearest valid time.';
+    }
+
+    var order = state.active.slice();
+    if(order.indexOf(state.src) === -1) order.unshift(state.src);
+
+    var lines = [];
+    order.forEach(function(tz){
+      var card = document.createElement('div');
+      card.className = 'zone' + (tz === state.src ? ' src' : '');
+      var diff = dayNum(tz, utc) - srcDay;
+      var tag = '';
+      if(tz === state.src) tag = '<span class="tag src">Input</span>';
+      else if(diff > 0) tag = '<span class="tag">+' + diff + ' day' + (diff>1?'s':'') + '</span>';
+      else if(diff < 0) tag = '<span class="tag">' + diff + ' day' + (diff<-1?'s':'') + '</span>';
+      var tm = fmtTime(tz, utc, state.h24), dt = fmtDate(tz, utc), ab = abbrAt(tz, utc);
+      card.innerHTML =
+        '<div class="name"></div><div class="t"></div><div class="d"></div>';
+      card.querySelector('.name').innerHTML = '';
+      var nm = card.querySelector('.name');
+      nm.appendChild(document.createTextNode(labelFor(tz) + ' '));
+      var sp = document.createElement('span'); sp.className='abbr'; sp.textContent = ab; nm.appendChild(sp);
+      card.querySelector('.t').textContent = tm;
+      var dd = card.querySelector('.d'); dd.appendChild(document.createTextNode(dt)); dd.insertAdjacentHTML('beforeend', tag);
+      if(tz !== state.src || state.active.indexOf(tz) !== -1){
+        var x = document.createElement('button');
+        x.className='x'; x.type='button'; x.title='Remove'; x.setAttribute('aria-label','Remove ' + labelFor(tz)); x.textContent='×';
+        x.addEventListener('click', function(){
+          state.active = state.active.filter(function(z){return z!==tz;});
+          save(); render(); buildAdd();
+        });
+        card.appendChild(x);
+      }
+      gridEl.appendChild(card);
+      lines.push(labelFor(tz) + ': ' + tm + ' ' + ab + ' (' + dt + ')');
+    });
+    lastText = lines.join('\n');
+  }
+
+  function buildSrc(){
+    srcEl.innerHTML = '';
+    var seen = {};
+    var ids = CORE.map(function(z){return z.id;});
+    state.active.forEach(function(z){ if(ids.indexOf(z)===-1) ids.push(z); });
+    if(ids.indexOf(state.src)===-1) ids.push(state.src);
+    ids.forEach(function(id){
+      seen[id]=1;
+      var o = document.createElement('option'); o.value=id; o.textContent=labelFor(id); srcEl.appendChild(o);
+    });
+    srcEl.value = state.src;
+  }
+
+  function buildAdd(){
+    addSel.innerHTML = '';
+    var ph = document.createElement('option'); ph.value=''; ph.textContent='Add another city or zone...'; addSel.appendChild(ph);
+    allZones().forEach(function(z){
+      if(state.active.indexOf(z) !== -1) return;
+      var o = document.createElement('option'); o.value=z; o.textContent=z.replace(/_/g,' '); addSel.appendChild(o);
+    });
+  }
+
+  function todayStr(){
+    var n = new Date(), p = function(v){return (v<10?'0':'')+v;};
+    return n.getFullYear() + '-' + p(n.getMonth()+1) + '-' + p(n.getDate());
+  }
+
+  // ---- events ----
+  timeEl.addEventListener('input', render);
+  dateEl.addEventListener('input', render);
+  srcEl.addEventListener('change', function(){ state.src = srcEl.value; save(); render(); });
+  h24El.addEventListener('change', function(){ state.h24 = h24El.checked; save(); render(); });
+
+  $('now').addEventListener('click', function(){
+    var src = state.src;
+    var p = partsAt(src, Date.now());
+    var pad = function(v){return (v<10?'0':'')+v;};
+    dateEl.value = p.year + '-' + pad(p.month) + '-' + pad(p.day);
+    timeEl.value = pad(p.hour) + ':' + pad(p.minute);
+    render();
+  });
+  $('addBtn').addEventListener('click', function(){
+    var v = addSel.value; if(!v) return;
+    if(state.active.indexOf(v)===-1) state.active.push(v);
+    save(); buildSrc(); buildAdd(); render();
+  });
+  $('reset').addEventListener('click', function(){
+    state.active = DEFAULT_ACTIVE.slice(); save(); buildSrc(); buildAdd(); render();
+  });
+  $('copy').addEventListener('click', function(){
+    var btn = $('copy');
+    if(!lastText) return;
+    var done = function(){ btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy as text';},1200); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(lastText).then(done, function(){});
+    }
+  });
+
+  // ---- init ----
+  load();
+  dateEl.value = todayStr();
+  h24El.checked = state.h24;
+  buildSrc(); buildAdd(); render();
+})();
+</script>
+</body>
+</html>
