@@ -3,343 +3,789 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Time Zone Converter</title>
+<title>Time Zone Globe</title>
+<meta name="color-scheme" content="dark">
 <style>
   :root{
-    --bg:#f5f4f0; --card:#ffffff; --ink:#1b1b1f; --muted:#6b6b76; --line:#e2e0d9;
-    --accent:#2d5bff; --accent-ink:#ffffff; --src:#eaf0ff; --src-line:#b8c9ff;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#121316; --card:#1b1c21; --ink:#f0f0f3; --muted:#9a9aa6; --line:#2c2d34;
-      --accent:#6c8cff; --accent-ink:#0b0c10; --src:#1e2745; --src-line:#3a4c8f;
-    }
+    --bg:#060a14; --panel:#0e1424; --panel2:#131a2e; --line:#202a45; --ink:#eef1fa; --muted:#8a94b2;
+    --accent:#6c8cff; --sun:#ffc94a; --night:#8ab4ff; --bad:#ff6b6b;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  main{max-width:960px;margin:0 auto;padding:32px 20px 64px}
-  h1{font-size:1.6rem;margin:0 0 4px;letter-spacing:-0.01em}
-  .sub{color:var(--muted);margin:0 0 24px}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:14px;
-    grid-template-columns:1.1fr 1fr 1.4fr auto;align-items:end}
-  @media (max-width:760px){.panel{grid-template-columns:1fr 1fr}.panel .wide{grid-column:1/-1}}
-  label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  html{color-scheme:dark}
+  body{margin:0;color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:radial-gradient(1200px 700px at 30% -10%, #101a38 0%, var(--bg) 60%) fixed, var(--bg)}
+  main{max-width:1180px;margin:0 auto;padding:28px 20px 56px}
+  h1{font-size:1.55rem;margin:0 0 2px;letter-spacing:-0.01em}
+  .sub{color:var(--muted);margin:0 0 20px}
+  label.l{display:block;font-size:.72rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em}
   input,select,button{font:inherit;color:inherit}
-  input,select{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
-  input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-  #time{font-size:1.25rem;font-weight:600}
-  #time.bad{border-color:#d33}
-  .btn{padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);cursor:pointer}
+  input[type=text],input[type=date],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2)}
+  input:focus,select:focus,button:focus-visible,.row:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .controls{display:grid;grid-template-columns:1fr 1fr 1.4fr auto;gap:12px;align-items:end;margin-bottom:16px}
+  @media (max-width:760px){.controls{grid-template-columns:1fr 1fr}.controls .wide{grid-column:1/-1}}
+  #time{font-size:1.15rem;font-weight:600}
+  #time.bad{border-color:var(--bad)}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);cursor:pointer}
   .btn:hover{border-color:var(--accent)}
-  .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}
-  .row .spacer{flex:1}
-  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.9rem;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0a0d18;font-weight:700}
+  .err{color:var(--bad);font-size:.88rem;min-height:1.2em;margin:0 0 8px}
+
+  .stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+  @media (max-width:900px){.stage{grid-template-columns:1fr}}
+
+  .globe-card{background:linear-gradient(180deg,var(--panel),#0a0f1d);border:1px solid var(--line);border-radius:18px;padding:12px 14px 16px}
+  .globe-box{position:relative;width:100%;aspect-ratio:1/1;max-height:640px}
+  canvas#globe{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;border-radius:14px}
+  canvas#globe.drag{cursor:grabbing}
+  .hint{position:absolute;left:12px;bottom:8px;color:var(--muted);font-size:.75rem;pointer-events:none}
+
+  .readout{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:8px 4px 4px}
+  .readout .big{font-size:2rem;font-weight:700;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+  .readout .where{color:var(--muted)}
+  .sliderrow{display:flex;gap:12px;align-items:center;padding:0 4px}
+  .play{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);cursor:pointer;display:grid;place-items:center;flex:none}
+  .play:hover{border-color:var(--accent)}
+  .play svg{width:16px;height:16px;fill:var(--ink)}
+  .sl{flex:1;position:relative}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;border-radius:99px;margin:0;cursor:pointer;
+    background:linear-gradient(90deg,#0d1326 0%,#0d1326 20%,#e6a93c 29%,#4f8fe6 40%,#4f8fe6 60%,#e6a93c 71%,#0d1326 80%,#0d1326 100%);
+    border:1px solid var(--line)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 2px 10px rgba(0,0,0,.5)}
+  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+  .ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:.7rem;margin-top:6px;padding:0 2px}
+
+  .side{display:flex;flex-direction:column;gap:12px}
+  .search{position:relative}
+  .search .inrow{display:flex;gap:8px}
+  #results{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;background:var(--panel2);
+    border:1px solid var(--line);border-radius:12px;max-height:320px;overflow:auto;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+  #results li{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+  #results li small{color:var(--muted)}
+  #results li.on,#results li:hover{background:#1c2748}
+  #results .note{color:var(--muted);cursor:default;font-size:.82rem}
+  #results .note:hover{background:none}
+  .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .tools .sp{flex:1}
+  .toggle{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.88rem;cursor:pointer}
   .toggle input{width:auto}
-  .hint{color:var(--muted);font-size:.85rem;margin:6px 0 0}
-  .err{color:#d33;font-size:.9rem;min-height:1.2em;margin:8px 0 0}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-  .zone{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative}
-  .zone.src{background:var(--src);border-color:var(--src-line)}
-  .zone .name{font-weight:600}
-  .zone .abbr{color:var(--muted);font-size:.85rem}
-  .zone .t{font-size:2rem;font-weight:700;letter-spacing:-0.02em;margin:6px 0 2px;font-variant-numeric:tabular-nums}
-  .zone .d{color:var(--muted);font-size:.9rem}
-  .tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:99px;font-size:.75rem;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
-  .tag.src{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-  .x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:1.1rem;line-height:1}
-  .x:hover{color:#d33}
-  .add{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
-  .add select{max-width:380px}
-  footer{margin-top:28px;color:var(--muted);font-size:.85rem}
+
+  ul#list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:10px 14px;cursor:pointer;position:relative;transition:border-color .15s, background .15s}
+  .row:hover{border-color:#34467f}
+  .row.src{background:#142049;border-color:#3b57c4}
+  .row.flash{animation:flash 1.4s ease-out}
+  @keyframes flash{0%{box-shadow:0 0 0 3px rgba(108,140,255,.7)}100%{box-shadow:0 0 0 3px rgba(108,140,255,0)}}
+  .ico{width:26px;height:26px}
+  .nm{font-weight:600;line-height:1.2}
+  .nm .ab{color:var(--muted);font-weight:400;font-size:.8rem;margin-left:6px}
+  .pl{color:var(--muted);font-size:.8rem}
+  .tm{text-align:right;font-variant-numeric:tabular-nums}
+  .tm b{font-size:1.45rem;letter-spacing:-0.02em;display:block;line-height:1.1}
+  .tm span{color:var(--muted);font-size:.8rem}
+  .tag{display:inline-block;margin-left:6px;padding:0 7px;border-radius:99px;font-size:.7rem;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .tag.in{background:var(--accent);color:#0a0d18;border-color:var(--accent);font-weight:700}
+  .x{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer;
+    font-size:.95rem;line-height:1;opacity:0;transition:opacity .15s;display:grid;place-items:center;padding:0}
+  .row:hover .x,.row:focus-within .x{opacity:1}
+  .x:hover{color:var(--bad);border-color:var(--bad)}
+  @media (hover:none){.x{opacity:1}}
+  footer{margin-top:24px;color:var(--muted);font-size:.8rem}
 </style>
 </head>
 <body>
 <main>
-  <h1>Time Zone Converter</h1>
-  <p class="sub">Type a time, pick the zone it is in, and see it everywhere else. Daylight saving is handled for the chosen date.</p>
+  <h1>Time Zone Globe</h1>
+  <p class="sub">Type a time or drag the slider and watch daylight sweep across the planet. Search any town or city to add it.</p>
 
-  <section class="panel" aria-label="Input">
+  <section class="controls" aria-label="Input">
     <div>
-      <label for="time">Time</label>
-      <input id="time" type="text" value="9:00am" autocomplete="off" inputmode="text" spellcheck="false" aria-describedby="hint">
+      <label class="l" for="time">Time</label>
+      <input id="time" type="text" value="9:00am" autocomplete="off" spellcheck="false" aria-describedby="err">
     </div>
     <div>
-      <label for="date">Date</label>
+      <label class="l" for="date">Date</label>
       <input id="date" type="date">
     </div>
     <div class="wide">
-      <label for="src">In this time zone</label>
+      <label class="l" for="src">Time is in</label>
       <select id="src"></select>
     </div>
-    <div>
-      <button class="btn" id="now" type="button">Now</button>
-    </div>
+    <div><button class="btn" id="now" type="button">Now</button></div>
   </section>
-  <p class="hint" id="hint">Try: 9am, 9:30 pm, 14:00, 1430, noon, midnight.</p>
   <p class="err" id="err" role="alert"></p>
 
-  <div class="row">
-    <label class="toggle"><input type="checkbox" id="h24"> 24 hour clock</label>
-    <span class="spacer"></span>
-    <button class="btn" id="copy" type="button">Copy as text</button>
-    <button class="btn" id="reset" type="button">Reset zones</button>
+  <div class="stage">
+    <section class="globe-card" aria-label="Globe">
+      <div class="globe-box">
+        <canvas id="globe" tabindex="0" aria-label="Interactive globe showing day and night. Drag to rotate."></canvas>
+        <div class="hint">Drag to spin. Click a pin to centre it.</div>
+      </div>
+      <div class="readout"><span class="big" id="big">9:00 AM</span><span class="where" id="where"></span></div>
+      <div class="sliderrow">
+        <button class="play" id="play" type="button" aria-label="Play the day"><svg viewBox="0 0 16 16" id="playico"><path d="M3 1.5v13l11-6.5z"/></svg></button>
+        <div class="sl">
+          <input id="slider" type="range" min="0" max="1439" step="1" value="540" aria-label="Time of day">
+          <div class="ticks" aria-hidden="true"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="side" aria-label="Places">
+      <div class="search">
+        <label class="l" for="q">Add a town or city</label>
+        <div class="inrow"><input id="q" type="text" placeholder="Try Ware, Kuala Lumpur, Galveston..." autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="results"></div>
+        <ul id="results" role="listbox" hidden></ul>
+      </div>
+      <div class="tools">
+        <label class="toggle"><input type="checkbox" id="h24"> 24 hour clock</label>
+        <span class="sp"></span>
+        <button class="btn" id="copy" type="button">Copy as text</button>
+        <button class="btn" id="reset" type="button">Reset</button>
+      </div>
+      <ul id="list" aria-live="polite"></ul>
+    </section>
   </div>
 
-  <section class="grid" id="grid" aria-live="polite"></section>
-
-  <div class="add">
-    <select id="addSel" aria-label="Add a time zone"></select>
-    <button class="btn primary" id="addBtn" type="button">Add zone</button>
-  </div>
-
-  <footer>Uses your browser's built in time zone data, so results stay correct across clock changes.</footer>
+  <footer>Daylight uses the real position of the sun for the date and time shown. Time zone rules come from your browser, so clock changes are handled automatically.</footer>
 </main>
 
 <script>
 (function(){
-  // Core zones. Labels are what you see; ids are IANA names.
-  var CORE = [
-    {id:'UTC',                 label:'GMT / UTC'},
-    {id:'Europe/London',       label:'UK (London)'},
-    {id:'America/New_York',    label:'Eastern (US)'},
-    {id:'America/Chicago',     label:'Central (US)'},
-    {id:'America/Denver',      label:'Mountain (US)'},
-    {id:'America/Los_Angeles', label:'Pacific (US)'},
-    {id:'Europe/Paris',        label:'Central Europe'},
-    {id:'Asia/Dubai',          label:'Dubai'},
-    {id:'Asia/Kolkata',        label:'India'},
-    {id:'Asia/Singapore',      label:'Singapore'},
-    {id:'Asia/Tokyo',          label:'Tokyo'},
-    {id:'Australia/Sydney',    label:'Sydney'},
-    {id:'Pacific/Auckland',    label:'Auckland'}
-  ];
-  var DEFAULT_ACTIVE = CORE.map(function(z){return z.id;});
+'use strict';
 
-  var $ = function(id){return document.getElementById(id);};
-  var timeEl=$('time'), dateEl=$('date'), srcEl=$('src'), errEl=$('err'), gridEl=$('grid'),
-      h24El=$('h24'), addSel=$('addSel');
+// ---------- data ----------
+var LAND_B64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADA/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPj/z////3EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/++f///wcAAPADgAEAAOADAAAAAAAAAAAAAAAg3N4f/v///wcAAB8AAAAAAAA4AAAAAAAAAAAAAAADAOAH/P///wcAAA4AAAAAAAAwAAAAAAAAAAAAAAC8cQwBAP///wcAAAAAAIAHAMD/DwDwAAAAAAAAAOAAAAAAAPz//wMAAAAAAGAAAPz/AQAAAAAAAAAAAOBdc/MDAPj//wEAAAAAABjAwP///z9gAAAAA4AAAED8A/P/AOD//wEAAAAAADjg/v///z//HwCAAPj/A0/8X4PwB/D//wAAAOA/AADh/v///////wM+A/7///8Pw56BB+D/DwAAAPz/Y+zf/f//////////N/D///////+Bf/D/AQAAAP7/x////v//////////GP7//////7/wJ+AfAH4AAD9++P//////////////AOD//////88GH8AfAAwAwJ////////////////9/APz//////wNxDIAPAAAA8M///////////////98/APzf/////wHwAwAGAAAA+M///////////////+ADAPAB+P///wHwMwAAAAAA8A//////////////ZBgAAIACgP///wPgfwAAAAAQAAf///////////8fAA4AACAAAP///z/gfwAAAAAwYMf///////////8PAB8AAAQAAP7////5/wMAAABoQOj///////////8DAA8AAAAAgPz////5/wcAAADs+P////////////9/AAcAAAAAAPj////7/wMAAADg+f////////////9/AAEAAAAAAPj/////zwAAAAAw/v////////////+/AAAAAAAAAPD/////Gw4AAACg//////////////8fAAAAAAAAAOD/////HxAAAADA//////////////8fAAAAAAAAAOD//////wAAAACA//9P/vj///////8PAAAAAAAAAOD/////EwAAAACA//wHfPz////////HAAAAAAAAAOD/////AQAAAAD8g/EH8Pj////////gAAAAAAAAAOD/////AAAAAAD8Aebn+fH//////z8AAAAAAAAAAOD///9/AAAAAAD8AGT8//H//////xpgAAAAAAAAAMD///8/AAAAAAD8AMT8//H/////fzggAAAAAAAAAID///8fAAAAAABwdAD8/////////zE4AAAAAAAAAID///8fAAAAAACwfwBD/////////zA/AAAAAAAAAAD+//8PAAAAAAD4fwAA/////////wAHAAAAAAAAAAD8//8DAAAAAAD8/2OA/////////4EAAAAAAAAAAADo//8DAAAAAAD8/+///////////wEAAAAAAAAAAADo/wkCAAAAAAD+//////z//////wEAAAAAAAAAAADYfwACAAAAAID///8///n//////wEAAAAAAAAAAACgfwAWAAAAAMD///9//+H//////wAAAAAAAAAAAAAgfwAAAAAAAMD///9//jPg////fwAAAAAAAAAAAAAAfgAAAAAAAOD//////H/A////PwEAAAAAAAAAAAAAfAAIAAAAAOD//////f/A/+f/BwAAAAAAAAAAAAAAfDBwAAAAAOD/////+X8A/sN/AAAAAAAAAAAAAAAA+DgAAwAAAOD/////+T8A/oB/AwAAAAAAAAAAAAAA4B8AAAAAAOD/////8x8AfoB/AAMAAAAAAAAAAAAAgPwAAAAAAOD/////8wcAPoD+AAEAAAAAAAAAAAAAAPgBAAAAAOD/////7wEAHAD+AQEAAAAAAAAAAAAAAMAAAAAAAOD/////PwAAHAD8AQQAAAAAAAAAAAAAAICAAgAAAMD/////HwMAGADgAAoAAAAAAAAAAAAAAADBfgAAAID//////wMAGABAAAAAAAAAAAAAAAAAAADy/wAAAID//////wEAIAAGAAwAAAAAAAAAAAAAAADw/wEAAAD//////wEAIAAIAAgAAAAAAAAAAAAAAADw/x8AAAD8+P///wAAAAAZYAAAAAAAAAAAAAAAAADg/z8AAAAAwP///wAAAAAbMAAAAAAAAAAAAAAAAADw/z8AAAAAwP//fwAAAAAWfAAAAAAAAAAAAAAAAAD4/38AAAAAwP//HwAAAAAcficAAAAAAAAAAAAAAAD8//8BAAAAwP//DwAAAAAYPiABAAAAAAAAAAAAAAD8//8DAAAAwP//BwAAAAA4vgEaAAAAAAAAAAAAAAD8//8/AAAAgP//BwAAAABwEBL+AAAAAAAAAAAAAAD8////AAAAAP//AwAAAABgAADwAQAAAAAAAAAAAAD8////AQAAAP//AwAAAADABADyAwEAAAAAAAAAAAD4////AQAAAP7/AwAAAAAAHADwBgQAAAAAAAAAAADw////AAAAAP7/BwAAAAAAAAQADAAAAAAAAAAAAADw//9/AAAAAP7/BwAAAAAAAAAAAAAAAAAAAAAAAADg//9/AAAAAP7/BwAAAAAAAICHAAAAAAAAAAAAAADg//8/AAAAAP//BwEAAAAAANDHAAAAAAAAAAAAAADA//8/AAAAAP//hwMAAAAAAPjHAQAAAAAAAAAAAAAA//8/AAAAAP//4QEAAAAAAPzfAQAAAAAAAAAAAAAA/v8/AAAAAP//4AEAAAAAAP7/AwAAAAAAAAAAAAAA/v8fAAAAAP5/wAAAAAAAgP//ByAAAAAAAAAAAAAA/v8fAAAAAP7/4AAAAAAA4P//D0AAAAAAAAAAAAAA/v8HAAAAAPz/4AAAAAAA8P//HwAAAAAAAAAAAAAA/v8AAAAAAPx/YAAAAAAA8P//PwAAAAAAAAAAAAAA/v8AAAAAAPw/AAAAAAAA8P//PwAAAAAAAAAAAAAA/v8AAAAAAPw/AAAAAAAA8P//PwAAAAAAAAAAAAAA/38AAAAAAPgfAAAAAAAA4P//PwAAAAAAAAAAAAAA/z8AAAAAAPAPAAAAAAAA4P//PwAAAAAAAAAAAAAA/x8AAAAAAPAHAAAAAAAA4B/+PwAAAAAAAAAAAAAA/w8AAAAAAPABAAAAAAAA4Af0HwAAAAAAAAAAAAAA/wMAAAAAAAAAAAAAAAAAAADwDwAIAAAAAAAAAACA/wMAAAAAAAAAAAAAAAAAAADgDwAQAAAAAAAAAACA/wEAAAAAAAAAAAAAAAAAAADAAgBwAAAAAAAAAACAfwAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAACAHwAAAAAAAAAAAAAAAAAAAAAABgAQAAAAAAAAAACAHwAAAAAAAAAAAAAAAAAAAAAABgAMAAAAAAAAAADADwAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAADABwAAAAAAAAAAAAAAAAAAAAAAAIADAAAAAAAAAADADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAgwEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAADwAAAR4Pv4HAAAAAAAAAAAAAAAACAAAAAAAAAAA4P8/4P//////BwAAAAAAAAAAAAAAPwAAAAAAAADg//8//P///////wMAAAAAAAAAAACAewAAAADI/v////8///////////8BAAAAAAAAABAAeAAAAID///////////////////8DAAAAAAAe4P//fwAAAMD//////////////////38AAADA////////BwAAAPz//////////////////x8AAEDz//////8/AAAA8P///////////////////x8AABj///////8PAIAH/////////////////////38AAADA//////8/gPAD4P///////////////////wcAAAD+////////P4Dx/////////////////////w8AAAD8//////////////////////////////////8A/wMA/v//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////';
+var GW = 240, GH = 120, GSTEP = 1.5;
 
-  var state = {active: DEFAULT_ACTIVE.slice(), src:'UTC', h24:false};
+// name, country, lat, lon, IANA zone
+var CITIES = [
+['London','United Kingdom',51.51,-0.13,'Europe/London'],['Ware','United Kingdom',51.81,-0.03,'Europe/London'],
+['Manchester','United Kingdom',53.48,-2.24,'Europe/London'],['Edinburgh','United Kingdom',55.95,-3.19,'Europe/London'],
+['Dublin','Ireland',53.35,-6.26,'Europe/Dublin'],['Paris','France',48.86,2.35,'Europe/Paris'],
+['Berlin','Germany',52.52,13.4,'Europe/Berlin'],['Madrid','Spain',40.42,-3.7,'Europe/Madrid'],
+['Barcelona','Spain',41.39,2.17,'Europe/Madrid'],['Lisbon','Portugal',38.72,-9.14,'Europe/Lisbon'],
+['Estoril','Portugal',38.7,-9.39,'Europe/Lisbon'],['Rome','Italy',41.9,12.5,'Europe/Rome'],
+['Amsterdam','Netherlands',52.37,4.9,'Europe/Amsterdam'],['Brussels','Belgium',50.85,4.35,'Europe/Brussels'],
+['Zurich','Switzerland',47.38,8.54,'Europe/Zurich'],['Vienna','Austria',48.21,16.37,'Europe/Vienna'],
+['Prague','Czechia',50.08,14.44,'Europe/Prague'],['Warsaw','Poland',52.23,21.01,'Europe/Warsaw'],
+['Stockholm','Sweden',59.33,18.07,'Europe/Stockholm'],['Oslo','Norway',59.91,10.75,'Europe/Oslo'],
+['Copenhagen','Denmark',55.68,12.57,'Europe/Copenhagen'],['Helsinki','Finland',60.17,24.94,'Europe/Helsinki'],
+['Athens','Greece',37.98,23.73,'Europe/Athens'],['Istanbul','Turkey',41.01,28.98,'Europe/Istanbul'],
+['Moscow','Russia',55.76,37.62,'Europe/Moscow'],['Kyiv','Ukraine',50.45,30.52,'Europe/Kyiv'],
+['Reykjavik','Iceland',64.15,-21.94,'Atlantic/Reykjavik'],
+['Cairo','Egypt',30.04,31.24,'Africa/Cairo'],['Lagos','Nigeria',6.52,3.38,'Africa/Lagos'],
+['Nairobi','Kenya',-1.29,36.82,'Africa/Nairobi'],['Johannesburg','South Africa',-26.2,28.05,'Africa/Johannesburg'],
+['Cape Town','South Africa',-33.92,18.42,'Africa/Johannesburg'],['Casablanca','Morocco',33.57,-7.59,'Africa/Casablanca'],
+['Accra','Ghana',5.6,-0.19,'Africa/Accra'],
+['Dubai','United Arab Emirates',25.2,55.27,'Asia/Dubai'],['Riyadh','Saudi Arabia',24.71,46.68,'Asia/Riyadh'],
+['Tel Aviv','Israel',32.09,34.78,'Asia/Jerusalem'],['Tehran','Iran',35.69,51.39,'Asia/Tehran'],
+['Karachi','Pakistan',24.86,67.0,'Asia/Karachi'],['Delhi','India',28.61,77.21,'Asia/Kolkata'],
+['Mumbai','India',19.08,72.88,'Asia/Kolkata'],['Bengaluru','India',12.97,77.59,'Asia/Kolkata'],
+['Dhaka','Bangladesh',23.81,90.41,'Asia/Dhaka'],['Bangkok','Thailand',13.76,100.5,'Asia/Bangkok'],
+['Jakarta','Indonesia',-6.21,106.85,'Asia/Jakarta'],['Singapore','Singapore',1.35,103.82,'Asia/Singapore'],
+['Kuala Lumpur','Malaysia',3.14,101.69,'Asia/Kuala_Lumpur'],['Hong Kong','Hong Kong',22.32,114.17,'Asia/Hong_Kong'],
+['Shanghai','China',31.23,121.47,'Asia/Shanghai'],['Beijing','China',39.9,116.41,'Asia/Shanghai'],
+['Seoul','South Korea',37.57,126.98,'Asia/Seoul'],['Tokyo','Japan',35.68,139.69,'Asia/Tokyo'],
+['Manila','Philippines',14.6,120.98,'Asia/Manila'],['Taipei','Taiwan',25.03,121.57,'Asia/Taipei'],
+['Ho Chi Minh City','Vietnam',10.82,106.63,'Asia/Ho_Chi_Minh'],
+['Sydney','Australia',-33.87,151.21,'Australia/Sydney'],['Melbourne','Australia',-37.81,144.96,'Australia/Melbourne'],
+['Brisbane','Australia',-27.47,153.03,'Australia/Brisbane'],['Perth','Australia',-31.95,115.86,'Australia/Perth'],
+['Adelaide','Australia',-34.93,138.6,'Australia/Adelaide'],['Auckland','New Zealand',-36.85,174.76,'Pacific/Auckland'],
+['Wellington','New Zealand',-41.29,174.78,'Pacific/Auckland'],['Honolulu','United States',21.31,-157.86,'Pacific/Honolulu'],
+['New York','United States',40.71,-74.01,'America/New_York'],['Washington DC','United States',38.91,-77.04,'America/New_York'],
+['Boston','United States',42.36,-71.06,'America/New_York'],['Philadelphia','United States',39.95,-75.17,'America/New_York'],
+['Atlanta','United States',33.75,-84.39,'America/New_York'],['Miami','United States',25.76,-80.19,'America/New_York'],
+['Chicago','United States',41.88,-87.63,'America/Chicago'],['Houston','United States',29.76,-95.37,'America/Chicago'],
+['Dallas','United States',32.78,-96.8,'America/Chicago'],['Galveston','United States',29.3,-94.8,'America/Chicago'],
+['Huntsville','United States',34.73,-86.59,'America/Chicago'],['Denver','United States',39.74,-104.99,'America/Denver'],
+['Phoenix','United States',33.45,-112.07,'America/Phoenix'],['Salt Lake City','United States',40.76,-111.89,'America/Denver'],
+['Las Vegas','United States',36.17,-115.14,'America/Los_Angeles'],['Los Angeles','United States',34.05,-118.24,'America/Los_Angeles'],
+['San Francisco','United States',37.77,-122.42,'America/Los_Angeles'],['San Diego','United States',32.72,-117.16,'America/Los_Angeles'],
+['Seattle','United States',47.61,-122.33,'America/Los_Angeles'],['Portland','United States',45.52,-122.68,'America/Los_Angeles'],
+['Anchorage','United States',61.22,-149.9,'America/Anchorage'],['Toronto','Canada',43.65,-79.38,'America/Toronto'],
+['Montreal','Canada',45.5,-73.57,'America/Toronto'],['Vancouver','Canada',49.28,-123.12,'America/Vancouver'],
+['Calgary','Canada',51.05,-114.07,'America/Edmonton'],['Mexico City','Mexico',19.43,-99.13,'America/Mexico_City'],
+['Bogota','Colombia',4.71,-74.07,'America/Bogota'],['Lima','Peru',-12.05,-77.04,'America/Lima'],
+['Sao Paulo','Brazil',-23.55,-46.63,'America/Sao_Paulo'],['Buenos Aires','Argentina',-34.6,-58.38,'America/Argentina/Buenos_Aires'],
+['Santiago','Chile',-33.45,-70.67,'America/Santiago']
+];
 
-  function load(){
+var CORE = [
+  {id:'utc',  name:'GMT / UTC',      sub:'Coordinated Universal Time', tz:'UTC',                 lat:0,     lon:0},
+  {id:'uk',   name:'UK',             sub:'London',        tz:'Europe/London',       lat:51.51, lon:-0.13},
+  {id:'et',   name:'Eastern (US)',   sub:'New York',      tz:'America/New_York',    lat:40.71, lon:-74.01},
+  {id:'ct',   name:'Central (US)',   sub:'Chicago',       tz:'America/Chicago',     lat:41.88, lon:-87.63},
+  {id:'mt',   name:'Mountain (US)',  sub:'Denver',        tz:'America/Denver',      lat:39.74, lon:-104.99},
+  {id:'pt',   name:'Pacific (US)',   sub:'Los Angeles',   tz:'America/Los_Angeles', lat:34.05, lon:-118.24},
+  {id:'cet',  name:'Central Europe', sub:'Berlin',        tz:'Europe/Berlin',       lat:52.52, lon:13.4},
+  {id:'dxb',  name:'Dubai',          sub:'United Arab Emirates', tz:'Asia/Dubai',   lat:25.2,  lon:55.27},
+  {id:'ind',  name:'India',          sub:'Mumbai',        tz:'Asia/Kolkata',        lat:19.08, lon:72.88},
+  {id:'sin',  name:'Singapore',      sub:'Singapore',     tz:'Asia/Singapore',      lat:1.35,  lon:103.82},
+  {id:'tyo',  name:'Tokyo',          sub:'Japan',         tz:'Asia/Tokyo',          lat:35.68, lon:139.69},
+  {id:'syd',  name:'Sydney',         sub:'Australia',     tz:'Australia/Sydney',    lat:-33.87,lon:151.21},
+  {id:'akl',  name:'Auckland',       sub:'New Zealand',   tz:'Pacific/Auckland',    lat:-36.85,lon:174.76}
+];
+
+var $ = function(id){return document.getElementById(id);};
+var timeEl=$('time'), dateEl=$('date'), srcEl=$('src'), errEl=$('err'), listEl=$('list'),
+    sliderEl=$('slider'), bigEl=$('big'), whereEl=$('where'), h24El=$('h24'),
+    qEl=$('q'), resEl=$('results'), playBtn=$('play');
+
+var state = {items: CORE.slice(), src:'utc', h24:false};
+var dateStr = '', minutes = 540;
+var rt = {};            // runtime per item id
+var sunNow = {dec:0, lon:0};
+var lastText = '';
+var flashId = null;
+
+// ---------- persistence ----------
+function load(){
+  try{
+    var s = JSON.parse(localStorage.getItem('tzglobe') || 'null');
+    if(s && Array.isArray(s.items) && s.items.length){
+      state.items = s.items.filter(function(i){return i && i.id && i.tz && typeof i.lat==='number';});
+      if(!state.items.length) state.items = CORE.slice();
+      if(s.src) state.src = s.src;
+      if(typeof s.h24 === 'boolean') state.h24 = s.h24;
+    }
+  }catch(e){}
+  if(!byId(state.src)) state.src = state.items[0].id;
+}
+function save(){ try{ localStorage.setItem('tzglobe', JSON.stringify(state)); }catch(e){} }
+function byId(id){ for(var i=0;i<state.items.length;i++){ if(state.items[i].id===id) return state.items[i]; } return null; }
+
+// ---------- time maths ----------
+var fmtCache = {};
+function dtf(tz){
+  if(!fmtCache[tz]){
+    fmtCache[tz] = new Intl.DateTimeFormat('en-GB', {timeZone: tz, hourCycle:'h23', year:'numeric', month:'numeric', day:'numeric',
+      hour:'numeric', minute:'numeric', second:'numeric'});
+  }
+  return fmtCache[tz];
+}
+function partsAt(tz, ms){
+  var o = {};
+  dtf(tz).formatToParts(new Date(ms)).forEach(function(p){ if(p.type!=='literal') o[p.type] = parseInt(p.value,10); });
+  return o;
+}
+function offsetMs(tz, ms){
+  var p = partsAt(tz, ms);
+  return Date.UTC(p.year, p.month-1, p.day, p.hour % 24, p.minute, p.second) - Math.floor(ms/1000)*1000;
+}
+function zonedToUtc(tz, y, m, d, h, mi){
+  var guess = Date.UTC(y, m-1, d, h, mi);
+  var off = offsetMs(tz, guess), utc = guess - off, off2 = offsetMs(tz, utc);
+  if(off2 !== off) utc = guess - off2;
+  return utc;
+}
+function abbrAt(tz, ms){
+  var found = [];
+  ['en-US','en-GB'].forEach(function(loc){
     try{
-      var s = JSON.parse(localStorage.getItem('tzconv') || 'null');
-      if(s){
-        if(Array.isArray(s.active) && s.active.length) state.active = s.active;
-        if(s.src) state.src = s.src;
-        if(typeof s.h24 === 'boolean') state.h24 = s.h24;
-      }
-    }catch(e){}
-  }
-  function save(){
-    try{ localStorage.setItem('tzconv', JSON.stringify(state)); }catch(e){}
-  }
-
-  function labelFor(id){
-    for(var i=0;i<CORE.length;i++){ if(CORE[i].id===id) return CORE[i].label; }
-    return id.replace(/_/g,' ').replace('/', ' / ');
-  }
-
-  function allZones(){
-    var list = [];
-    try{ if(Intl.supportedValuesOf) list = Intl.supportedValuesOf('timeZone'); }catch(e){}
-    if(!list.length) list = CORE.map(function(z){return z.id;});
-    return list;
-  }
-
-  // ---- time maths ----
-  var fmtCache = {};
-  function dtf(tz){
-    if(!fmtCache[tz]){
-      fmtCache[tz] = new Intl.DateTimeFormat('en-GB', {
-        timeZone: tz, hourCycle:'h23', year:'numeric', month:'numeric', day:'numeric',
-        hour:'numeric', minute:'numeric', second:'numeric'
+      new Intl.DateTimeFormat(loc, {timeZone:tz, timeZoneName:'short'}).formatToParts(new Date(ms)).forEach(function(p){
+        if(p.type==='timeZoneName') found.push(p.value);
       });
+    }catch(e){}
+  });
+  for(var j=0;j<found.length;j++){ if(!/^(GMT|UTC)[+-]/.test(found[j])) return found[j]; }
+  return found[0] || '';
+}
+function fmtTime(tz, ms, h24){
+  return new Intl.DateTimeFormat('en-GB', {timeZone: tz, hour:'numeric', minute:'2-digit', hour12: !h24})
+    .format(new Date(ms)).replace(/\b(am|pm)\b/i, function(x){return x.toUpperCase();});
+}
+function fmtDate(tz, ms){
+  return new Intl.DateTimeFormat('en-GB', {timeZone: tz, weekday:'short', day:'numeric', month:'short'}).format(new Date(ms));
+}
+function dayNum(tz, ms){ var p = partsAt(tz, ms); return Math.round(Date.UTC(p.year, p.month-1, p.day)/864e5); }
+function pad(v){return (v<10?'0':'')+v;}
+function fmtMinutes(m, h24){
+  var h = Math.floor(m/60), mi = m%60;
+  if(h24) return pad(h)+':'+pad(mi);
+  return ((h%12)||12)+':'+pad(mi)+' '+(h<12?'AM':'PM');
+}
+function parseTime(raw){
+  var s = raw.trim().toLowerCase().replace(/\./g,'').replace(/\s+/g,' ');
+  if(s==='noon') return [12,0];
+  if(s==='midnight') return [0,0];
+  var m = s.match(/^(\d{1,2})(?:[:h]?(\d{2}))?\s*(am|pm|a|p)?$/);
+  if(!m) return null;
+  var h = parseInt(m[1],10), mi = m[2] ? parseInt(m[2],10) : 0, ap = m[3];
+  if(mi > 59) return null;
+  if(ap){
+    if(h < 1 || h > 12) return null;
+    var pm = ap.charAt(0)==='p';
+    if(h===12) h = pm ? 12 : 0; else if(pm) h += 12;
+  }else if(h > 23) return null;
+  return [h, mi];
+}
+
+// ---------- sun ----------
+var D2R = Math.PI/180;
+function sunPos(ms){
+  var d = new Date(ms);
+  var N = (ms - Date.UTC(d.getUTCFullYear(),0,0))/864e5;
+  var dec = 23.44*Math.sin(2*Math.PI*(N-81)/365);
+  var B = 2*Math.PI*(N-81)/364;
+  var eot = 9.87*Math.sin(2*B) - 7.53*Math.cos(B) - 1.5*Math.sin(B);
+  var utcH = (ms % 864e5)/36e5;
+  var lon = -15*(utcH - 12 + eot/60);
+  lon = ((lon+540)%360)-180;
+  return {dec: dec*D2R, lon: lon*D2R};
+}
+function sunDot(latDeg, lonDeg){
+  var la = latDeg*D2R, lo = lonDeg*D2R;
+  return Math.sin(la)*Math.sin(sunNow.dec) + Math.cos(la)*Math.cos(sunNow.dec)*Math.cos(lo - sunNow.lon);
+}
+
+// ---------- update (data -> DOM) ----------
+function update(fromSlider){
+  var src = byId(state.src);
+  var dp = dateStr.split('-').map(Number);
+  var utc = zonedToUtc(src.tz, dp[0], dp[1], dp[2], Math.floor(minutes/60), minutes%60);
+  var chk = partsAt(src.tz, utc);
+  errEl.textContent = (chk.hour !== Math.floor(minutes/60) || chk.minute !== minutes%60)
+    ? 'That local time does not exist on this date in ' + src.name + ' (clocks change). Showing the nearest valid time.' : '';
+  sunNow = sunPos(utc);
+  var srcDay = dayNum(src.tz, utc);
+
+  var lines = [];
+  listEl.innerHTML = '';
+  state.items.forEach(function(it){
+    var tm = fmtTime(it.tz, utc, state.h24), dt = fmtDate(it.tz, utc), ab = abbrAt(it.tz, utc);
+    var diff = dayNum(it.tz, utc) - srcDay;
+    var d = sunDot(it.lat, it.lon);
+    var st = d > 0.02 ? 'day' : (d > -0.12 ? 'twilight' : 'night');
+    rt[it.id] = {time:tm, date:dt, abbr:ab, state:st};
+    lines.push(it.name + ': ' + tm + ' ' + ab + ' (' + dt + ')');
+
+    var li = document.createElement('li');
+    li.className = 'row' + (it.id===state.src ? ' src' : '') + (it.id===flashId ? ' flash' : '');
+    li.tabIndex = 0; li.dataset.id = it.id;
+    li.setAttribute('role','button');
+    li.setAttribute('aria-label', it.name + ', ' + tm + '. Centre on globe.');
+    var ic = document.createElement('div'); ic.className = 'ico'; ic.innerHTML = iconSvg(st); li.appendChild(ic);
+    var mid = document.createElement('div');
+    var nm = document.createElement('div'); nm.className = 'nm'; nm.appendChild(document.createTextNode(it.name));
+    var sp = document.createElement('span'); sp.className = 'ab'; sp.textContent = ab; nm.appendChild(sp);
+    var pl = document.createElement('div'); pl.className = 'pl'; pl.textContent = it.sub || '';
+    mid.appendChild(nm); mid.appendChild(pl); li.appendChild(mid);
+    var right = document.createElement('div'); right.className = 'tm';
+    var b = document.createElement('b'); b.textContent = tm;
+    var s2 = document.createElement('span'); s2.appendChild(document.createTextNode(dt));
+    var tag = document.createElement('span');
+    if(it.id===state.src){ tag.className='tag in'; tag.textContent='Input'; }
+    else if(diff!==0){ tag.className='tag'; tag.textContent=(diff>0?'+':'')+diff+' day'+(Math.abs(diff)>1?'s':''); }
+    if(tag.textContent) s2.appendChild(tag);
+    right.appendChild(b); right.appendChild(s2); li.appendChild(right);
+    if(it.id !== state.src){
+      var x = document.createElement('button'); x.className='x'; x.type='button'; x.title='Remove'; x.setAttribute('aria-label','Remove '+it.name); x.textContent='×';
+      x.dataset.remove = it.id; li.appendChild(x);
     }
-    return fmtCache[tz];
-  }
-  function partsAt(tz, utcMs){
-    var o = {};
-    dtf(tz).formatToParts(new Date(utcMs)).forEach(function(p){ if(p.type!=='literal') o[p.type] = parseInt(p.value,10); });
-    return o;
-  }
-  function offsetMs(tz, utcMs){
-    var p = partsAt(tz, utcMs);
-    var asUtc = Date.UTC(p.year, p.month-1, p.day, p.hour % 24, p.minute, p.second);
-    return asUtc - Math.floor(utcMs/1000)*1000;
-  }
-  function zonedToUtc(tz, y, m, d, h, mi){
-    var guess = Date.UTC(y, m-1, d, h, mi);
-    var off = offsetMs(tz, guess);
-    var utc = guess - off;
-    var off2 = offsetMs(tz, utc);
-    if(off2 !== off) utc = guess - off2;
-    return utc;
-  }
+    listEl.appendChild(li);
+  });
+  lastText = lines.join('\n');
 
-  function parseTime(raw){
-    var s = raw.trim().toLowerCase().replace(/\./g,'').replace(/\s+/g,' ');
-    if(s==='noon') return [12,0];
-    if(s==='midnight') return [0,0];
-    var m = s.match(/^(\d{1,2})(?:[:h]?(\d{2}))?\s*(am|pm|a|p)?$/);
-    if(!m) return null;
-    var h = parseInt(m[1],10), mi = m[2] ? parseInt(m[2],10) : 0, ap = m[3];
-    if(mi > 59) return null;
-    if(ap){
-      if(h < 1 || h > 12) return null;
-      var pm = ap.charAt(0) === 'p';
-      if(h === 12) h = pm ? 12 : 0; else if(pm) h += 12;
-    }else if(h > 23){
-      return null;
-    }
-    return [h, mi];
-  }
+  bigEl.textContent = fmtMinutes(minutes, state.h24);
+  whereEl.textContent = src.name + ' · ' + fmtDate(src.tz, utc);
+  if(fromSlider !== true) sliderEl.value = minutes;
+  dirty = true;
+}
 
-  function abbrAt(tz, utcMs){
-    var found = [];
-    ['en-US','en-GB'].forEach(function(loc){
-      try{
-        var parts = new Intl.DateTimeFormat(loc, {timeZone:tz, timeZoneName:'short'}).formatToParts(new Date(utcMs));
-        for(var i=0;i<parts.length;i++){ if(parts[i].type==='timeZoneName') found.push(parts[i].value); }
-      }catch(e){}
-    });
-    for(var j=0;j<found.length;j++){ if(!/^(GMT|UTC)[+-]/.test(found[j])) return found[j]; }
-    return found[0] || '';
-  }
+function iconSvg(st){
+  if(st==='day') return '<svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="5" fill="#ffc94a"/><g stroke="#ffc94a" stroke-width="2" stroke-linecap="round"><path d="M13 2v3M13 21v3M2 13h3M21 13h3M5.2 5.2l2.1 2.1M18.7 18.7l2.1 2.1M5.2 20.8l2.1-2.1M18.7 7.3l2.1-2.1"/></g></svg>';
+  if(st==='twilight') return '<svg viewBox="0 0 26 26"><path d="M3 18h20" stroke="#ff9a5a" stroke-width="2" stroke-linecap="round"/><path d="M7 18a6 6 0 0 1 12 0z" fill="#ff9a5a"/><path d="M13 5v3M5 10l2 2M21 10l-2 2" stroke="#ff9a5a" stroke-width="2" stroke-linecap="round"/></svg>';
+  return '<svg viewBox="0 0 26 26"><path d="M20 15.5A8 8 0 0 1 10.5 6a8 8 0 1 0 9.5 9.5z" fill="#8ab4ff"/></svg>';
+}
 
-  function fmtTime(tz, utcMs, h24){
-    return new Intl.DateTimeFormat('en-GB', {
-      timeZone: tz, hour:'numeric', minute:'2-digit', hour12: !h24
-    }).format(new Date(utcMs)).replace(/\b(am|pm)\b/i, function(x){return x.toUpperCase();});
-  }
-  function fmtDate(tz, utcMs){
-    return new Intl.DateTimeFormat('en-GB', {timeZone: tz, weekday:'short', day:'numeric', month:'short'}).format(new Date(utcMs));
-  }
-  function dayNum(tz, utcMs){
-    var p = partsAt(tz, utcMs);
-    return Math.round(Date.UTC(p.year, p.month-1, p.day) / 864e5);
-  }
+// ---------- globe ----------
+var canvas = $('globe'), ctx = canvas.getContext('2d');
+var dirty = true, W = 0, H = 0, DPR = 1, R = 0, CX = 0, CY = 0;
+var lat0 = 20*D2R, lon0 = 0;
+var tween = null, dragging = false, hoverId = null, pins = [];
+var land = decodeLand();
+var shade = document.createElement('canvas'), SH = 300; shade.width = SH; shade.height = SH;
+var sctx = shade.getContext('2d'), simg = sctx.createImageData(SH, SH);
+var stars = [];
+for(var si=0; si<110; si++){ stars.push([Math.random(), Math.random(), Math.random()*1.1+0.3, Math.random()*0.5+0.15]); }
 
-  // ---- render ----
-  var lastText = '';
-  function render(){
-    var t = parseTime(timeEl.value);
-    timeEl.classList.toggle('bad', !t);
-    gridEl.innerHTML = '';
-    if(!t){ errEl.textContent = 'Could not read that time. Try 9am, 14:30 or noon.'; lastText=''; return; }
-    if(!dateEl.value){ errEl.textContent = 'Pick a date.'; lastText=''; return; }
-    errEl.textContent = '';
-
-    var dp = dateEl.value.split('-').map(Number);
-    var utc = zonedToUtc(state.src, dp[0], dp[1], dp[2], t[0], t[1]);
-    var srcDay = dayNum(state.src, utc);
-
-    // sanity: DST gap check
-    var chk = partsAt(state.src, utc);
-    if(chk.hour !== t[0] || chk.minute !== t[1]){
-      errEl.textContent = 'That local time does not exist on this date in ' + labelFor(state.src) + ' (clocks change). Showing the nearest valid time.';
-    }
-
-    var order = state.active.slice();
-    if(order.indexOf(state.src) === -1) order.unshift(state.src);
-
-    var lines = [];
-    order.forEach(function(tz){
-      var card = document.createElement('div');
-      card.className = 'zone' + (tz === state.src ? ' src' : '');
-      var diff = dayNum(tz, utc) - srcDay;
-      var tag = '';
-      if(tz === state.src) tag = '<span class="tag src">Input</span>';
-      else if(diff > 0) tag = '<span class="tag">+' + diff + ' day' + (diff>1?'s':'') + '</span>';
-      else if(diff < 0) tag = '<span class="tag">' + diff + ' day' + (diff<-1?'s':'') + '</span>';
-      var tm = fmtTime(tz, utc, state.h24), dt = fmtDate(tz, utc), ab = abbrAt(tz, utc);
-      card.innerHTML =
-        '<div class="name"></div><div class="t"></div><div class="d"></div>';
-      card.querySelector('.name').innerHTML = '';
-      var nm = card.querySelector('.name');
-      nm.appendChild(document.createTextNode(labelFor(tz) + ' '));
-      var sp = document.createElement('span'); sp.className='abbr'; sp.textContent = ab; nm.appendChild(sp);
-      card.querySelector('.t').textContent = tm;
-      var dd = card.querySelector('.d'); dd.appendChild(document.createTextNode(dt)); dd.insertAdjacentHTML('beforeend', tag);
-      if(tz !== state.src || state.active.indexOf(tz) !== -1){
-        var x = document.createElement('button');
-        x.className='x'; x.type='button'; x.title='Remove'; x.setAttribute('aria-label','Remove ' + labelFor(tz)); x.textContent='×';
-        x.addEventListener('click', function(){
-          state.active = state.active.filter(function(z){return z!==tz;});
-          save(); render(); buildAdd();
-        });
-        card.appendChild(x);
+function decodeLand(){
+  var bin = atob(LAND_B64), pts = [];
+  for(var j=0;j<GH;j++){
+    for(var i=0;i<GW;i++){
+      var k = j*GW+i;
+      if((bin.charCodeAt(k>>3) >> (k&7)) & 1){
+        var lat = (90-(j+0.5)*GSTEP)*D2R, lon = (-180+(i+0.5)*GSTEP)*D2R;
+        pts.push({sl:Math.sin(lat), cl:Math.cos(lat), so:Math.sin(lon), co:Math.cos(lon)});
       }
-      gridEl.appendChild(card);
-      lines.push(labelFor(tz) + ': ' + tm + ' ' + ab + ' (' + dt + ')');
-    });
-    lastText = lines.join('\n');
+    }
+  }
+  return pts;
+}
+
+function resize(){
+  var box = canvas.parentNode.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  W = Math.max(280, Math.round(box.width)); H = Math.max(280, Math.round(box.height));
+  canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
+  R = Math.min(W,H)*0.42; CX = W/2; CY = H/2;
+  dirty = true;
+}
+function smooth(a,b,x){ var t = Math.max(0, Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
+
+function draw(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  // stars
+  for(var i=0;i<stars.length;i++){
+    ctx.fillStyle = 'rgba(200,215,255,'+stars[i][3]+')';
+    ctx.beginPath(); ctx.arc(stars[i][0]*W, stars[i][1]*H, stars[i][2], 0, 6.2832); ctx.fill();
   }
 
-  function buildSrc(){
-    srcEl.innerHTML = '';
-    var seen = {};
-    var ids = CORE.map(function(z){return z.id;});
-    state.active.forEach(function(z){ if(ids.indexOf(z)===-1) ids.push(z); });
-    if(ids.indexOf(state.src)===-1) ids.push(state.src);
-    ids.forEach(function(id){
-      seen[id]=1;
-      var o = document.createElement('option'); o.value=id; o.textContent=labelFor(id); srcEl.appendChild(o);
-    });
-    srcEl.value = state.src;
+  var sl0 = Math.sin(lat0), cl0 = Math.cos(lat0), so0 = Math.sin(lon0), co0 = Math.cos(lon0);
+  // sun in view space
+  var sdl = sunNow.lon - lon0, scl = Math.cos(sdl);
+  var sx = Math.cos(sunNow.dec)*Math.sin(sdl);
+  var sy = cl0*Math.sin(sunNow.dec) - sl0*Math.cos(sunNow.dec)*scl;
+  var sz = sl0*Math.sin(sunNow.dec) + cl0*Math.cos(sunNow.dec)*scl;
+
+  // atmosphere glow
+  var g = ctx.createRadialGradient(CX,CY,R*0.96,CX,CY,R*1.22);
+  g.addColorStop(0,'rgba(90,140,255,0.32)'); g.addColorStop(1,'rgba(90,140,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX,CY,R*1.22,0,6.2832); ctx.fill();
+
+  // ocean shading (per pixel, low res)
+  var data = simg.data, half = SH/2, idx = 0;
+  for(var py=0; py<SH; py++){
+    var v = -(py+0.5-half)/half;
+    for(var px=0; px<SH; px++, idx+=4){
+      var u = (px+0.5-half)/half, r2 = u*u+v*v;
+      if(r2 >= 1){ data[idx+3] = 0; continue; }
+      var nz = Math.sqrt(1-r2), d = u*sx + v*sy + nz*sz;
+      var t = smooth(-0.10, 0.22, d), warm = 4*t*(1-t), limb = 0.55+0.45*nz;
+      data[idx]   = (8  + (30-8)*t + 70*warm)*limb;
+      data[idx+1] = (14 + (88-14)*t + 24*warm)*limb;
+      data[idx+2] = (34 + (172-34)*t)*limb;
+      data[idx+3] = 255;
+    }
+  }
+  sctx.putImageData(simg,0,0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(shade, CX-R, CY-R, 2*R, 2*R);
+
+  // land dots
+  var spacing = R*GSTEP*D2R;
+  for(var k=0;k<land.length;k++){
+    var p = land[k];
+    var cdl = p.co*co0 + p.so*so0, sdlp = p.so*co0 - p.co*so0;
+    var z = sl0*p.sl + cl0*p.cl*cdl;
+    if(z < 0.03) continue;
+    var x = p.cl*sdlp, y = cl0*p.sl - sl0*p.cl*cdl;
+    var d2 = x*sx + y*sy + z*sz;
+    var t2 = smooth(-0.10, 0.22, d2), limb2 = 0.5+0.5*z;
+    var rr = (46 + (140-46)*t2)*limb2, gg = (60 + (210-60)*t2)*limb2, bb = (96 + (150-96)*t2)*limb2;
+    ctx.fillStyle = 'rgb('+(rr|0)+','+(gg|0)+','+(bb|0)+')';
+    var rad = spacing*0.42*(0.45+0.55*z);
+    ctx.beginPath(); ctx.arc(CX + x*R, CY - y*R, rad, 0, 6.2832); ctx.fill();
   }
 
-  function buildAdd(){
-    addSel.innerHTML = '';
-    var ph = document.createElement('option'); ph.value=''; ph.textContent='Add another city or zone...'; addSel.appendChild(ph);
-    allZones().forEach(function(z){
-      if(state.active.indexOf(z) !== -1) return;
-      var o = document.createElement('option'); o.value=z; o.textContent=z.replace(/_/g,' '); addSel.appendChild(o);
-    });
+  // rim
+  ctx.strokeStyle = 'rgba(140,175,255,0.30)'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,6.2832); ctx.stroke();
+
+  // sun marker
+  if(sz > 0){
+    var sg = ctx.createRadialGradient(CX+sx*R, CY-sy*R, 0, CX+sx*R, CY-sy*R, 26);
+    sg.addColorStop(0,'rgba(255,214,102,0.95)'); sg.addColorStop(0.25,'rgba(255,201,74,0.45)'); sg.addColorStop(1,'rgba(255,201,74,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(CX+sx*R, CY-sy*R, 26, 0, 6.2832); ctx.fill();
   }
 
-  function todayStr(){
-    var n = new Date(), p = function(v){return (v<10?'0':'')+v;};
-    return n.getFullYear() + '-' + p(n.getMonth()+1) + '-' + p(n.getDate());
-  }
-
-  // ---- events ----
-  timeEl.addEventListener('input', render);
-  dateEl.addEventListener('input', render);
-  srcEl.addEventListener('change', function(){ state.src = srcEl.value; save(); render(); });
-  h24El.addEventListener('change', function(){ state.h24 = h24El.checked; save(); render(); });
-
-  $('now').addEventListener('click', function(){
-    var src = state.src;
-    var p = partsAt(src, Date.now());
-    var pad = function(v){return (v<10?'0':'')+v;};
-    dateEl.value = p.year + '-' + pad(p.month) + '-' + pad(p.day);
-    timeEl.value = pad(p.hour) + ':' + pad(p.minute);
-    render();
+  // pins
+  pins = [];
+  var placed = [];
+  var order = state.items.slice().sort(function(a,b){
+    return (b.id===state.src) - (a.id===state.src) || (b.id===hoverId) - (a.id===hoverId);
   });
-  $('addBtn').addEventListener('click', function(){
-    var v = addSel.value; if(!v) return;
-    if(state.active.indexOf(v)===-1) state.active.push(v);
-    save(); buildSrc(); buildAdd(); render();
+  var lat, lon, cdl2, X, Y, Z;
+  var visible = [];
+  state.items.forEach(function(it){
+    lat = it.lat*D2R; lon = it.lon*D2R; cdl2 = Math.cos(lon-lon0);
+    X = Math.cos(lat)*Math.sin(lon-lon0);
+    Y = cl0*Math.sin(lat) - sl0*Math.cos(lat)*cdl2;
+    Z = sl0*Math.sin(lat) + cl0*Math.cos(lat)*cdl2;
+    if(Z > 0.02){ visible.push({it:it, x:CX+X*R, y:CY-Y*R}); pins.push({id:it.id, x:CX+X*R, y:CY-Y*R}); }
   });
-  $('reset').addEventListener('click', function(){
-    state.active = DEFAULT_ACTIVE.slice(); save(); buildSrc(); buildAdd(); render();
+  visible.forEach(function(v){
+    var it = v.it, r = rt[it.id]; if(!r) return;
+    var col = r.state==='day' ? '#ffd166' : (r.state==='twilight' ? '#ff9a5a' : '#8ab4ff');
+    var glow = ctx.createRadialGradient(v.x,v.y,0,v.x,v.y,14);
+    glow.addColorStop(0, col+'aa'); glow.addColorStop(1, col+'00');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(v.x,v.y,14,0,6.2832); ctx.fill();
+    ctx.fillStyle = col; ctx.strokeStyle = '#06101f'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(v.x,v.y, it.id===state.src ? 5.5 : 4, 0, 6.2832); ctx.fill(); ctx.stroke();
+    if(it.id===state.src){ ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(v.x,v.y,9,0,6.2832); ctx.stroke(); }
   });
-  $('copy').addEventListener('click', function(){
-    var btn = $('copy');
-    if(!lastText) return;
-    var done = function(){ btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy as text';},1200); };
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(lastText).then(done, function(){});
+  ctx.font = '600 11.5px system-ui,-apple-system,Segoe UI,Roboto,sans-serif'; ctx.textBaseline = 'middle';
+  order.forEach(function(it){
+    var v = null; for(var i=0;i<visible.length;i++){ if(visible[i].it.id===it.id){ v = visible[i]; break; } }
+    if(!v) return;
+    var r = rt[it.id]; if(!r) return;
+    var full = (it.id===state.src || it.id===hoverId);
+    var txt = full ? it.name + '  ' + r.time : r.time;
+    var tw = ctx.measureText(txt).width, bw = tw+12, bh = 20;
+    var cands = [[v.x+10, v.y-bh/2],[v.x-10-bw, v.y-bh/2],[v.x-bw/2, v.y-bh-8],[v.x-bw/2, v.y+8]];
+    for(var c=0;c<cands.length;c++){
+      var rx = cands[c][0], ry = cands[c][1], ok = true;
+      if(rx < 2 || rx+bw > W-2 || ry < 2 || ry+bh > H-2) ok = false;
+      for(var q=0;q<placed.length;q++){
+        var o = placed[q];
+        if(rx < o[0]+o[2]+2 && rx+bw+2 > o[0] && ry < o[1]+o[3]+2 && ry+bh+2 > o[1]){ ok = false; break; }
+      }
+      if(ok || (full && c===cands.length-1)){
+        placed.push([rx,ry,bw,bh]);
+        ctx.fillStyle = it.id===state.src ? 'rgba(40,64,160,0.92)' : 'rgba(8,14,30,0.82)';
+        roundRect(rx,ry,bw,bh,10); ctx.fill();
+        ctx.strokeStyle = it.id===state.src ? 'rgba(140,170,255,.9)' : 'rgba(120,150,230,.35)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#eef1fa'; ctx.textAlign = 'left'; ctx.fillText(txt, rx+6, ry+bh/2+0.5);
+        break;
+      }
     }
   });
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
 
-  // ---- init ----
-  load();
-  dateEl.value = todayStr();
-  h24El.checked = state.h24;
-  buildSrc(); buildAdd(); render();
+// rotation helpers
+function glideTo(latDeg, lonDeg){
+  var tl = Math.max(-55, Math.min(60, latDeg))*D2R, to = lonDeg*D2R;
+  var dlon = ((to - lon0 + Math.PI*3) % (Math.PI*2)) - Math.PI;
+  tween = {t0: performance.now(), dur: 750, la0: lat0, lo0: lon0, dla: tl - lat0, dlo: dlon};
+}
+
+// play
+var playing = false, lastTs = 0, minFloat = 0;
+function setPlaying(on){
+  playing = on; lastTs = 0; minFloat = minutes;
+  $('playico').innerHTML = on ? '<rect x="2.5" y="2" width="4" height="12"/><rect x="9.5" y="2" width="4" height="12"/>' : '<path d="M3 1.5v13l11-6.5z"/>';
+  playBtn.setAttribute('aria-label', on ? 'Pause' : 'Play the day');
+}
+
+function loop(ts){
+  if(playing){
+    if(lastTs){
+      minFloat = (minFloat + (ts-lastTs)/1000*200) % 1440;
+      var nm = Math.floor(minFloat);
+      if(nm !== minutes){ minutes = nm; timeEl.value = fmtMinutes(minutes, state.h24); timeEl.classList.remove('bad'); sliderEl.value = minutes; update(true); }
+    }
+    lastTs = ts;
+  }
+  if(tween){
+    var k = Math.min(1, (performance.now()-tween.t0)/tween.dur), e = k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    lat0 = tween.la0 + tween.dla*e; lon0 = tween.lo0 + tween.dlo*e; dirty = true;
+    if(k>=1) tween = null;
+  }
+  if(dirty){ dirty = false; draw(); }
+  requestAnimationFrame(loop);
+}
+
+// pointer interaction
+var down = null;
+canvas.addEventListener('pointerdown', function(e){
+  canvas.setPointerCapture(e.pointerId);
+  down = {x:e.clientX, y:e.clientY, moved:false}; dragging = true; tween = null; canvas.classList.add('drag');
+});
+canvas.addEventListener('pointermove', function(e){
+  var rect = canvas.getBoundingClientRect(), mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  if(dragging && down){
+    var dx = e.clientX-down.x, dy = e.clientY-down.y;
+    if(Math.abs(dx)+Math.abs(dy) > 3) down.moved = true;
+    var k = 1/R;
+    lon0 -= (e.clientX-down.x)*k*(1/Math.max(0.35,Math.cos(lat0)))*0.9;
+    lat0 += (e.clientY-down.y)*k*0.9;
+    lat0 = Math.max(-85*D2R, Math.min(85*D2R, lat0));
+    down.x = e.clientX; down.y = e.clientY; dirty = true;
+  }else{
+    var h = null, best = 14;
+    pins.forEach(function(p){ var d = Math.hypot(p.x-mx, p.y-my); if(d < best){ best = d; h = p.id; } });
+    if(h !== hoverId){ hoverId = h; dirty = true; canvas.style.cursor = h ? 'pointer' : 'grab'; }
+  }
+});
+function endDrag(e){
+  if(down && !down.moved){
+    var rect = canvas.getBoundingClientRect(), mx = e.clientX-rect.left, my = e.clientY-rect.top, hit = null, best = 16;
+    pins.forEach(function(p){ var d = Math.hypot(p.x-mx, p.y-my); if(d < best){ best = d; hit = p.id; } });
+    if(hit){ var it = byId(hit); glideTo(it.lat, it.lon); flashId = hit; update(true); setTimeout(function(){ flashId = null; }, 1500); }
+  }
+  dragging = false; down = null; canvas.classList.remove('drag');
+}
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', function(){ dragging = false; down = null; canvas.classList.remove('drag'); });
+canvas.addEventListener('pointerleave', function(){ if(hoverId){ hoverId = null; dirty = true; } });
+canvas.addEventListener('keydown', function(e){
+  var step = 8*D2R, used = true;
+  if(e.key==='ArrowLeft') lon0 -= step; else if(e.key==='ArrowRight') lon0 += step;
+  else if(e.key==='ArrowUp') lat0 = Math.min(85*D2R, lat0+step); else if(e.key==='ArrowDown') lat0 = Math.max(-85*D2R, lat0-step);
+  else used = false;
+  if(used){ e.preventDefault(); dirty = true; }
+});
+window.addEventListener('resize', resize);
+if(window.ResizeObserver) new ResizeObserver(resize).observe(canvas.parentNode);
+
+// ---------- controls ----------
+function buildSrc(){
+  srcEl.innerHTML = '';
+  state.items.forEach(function(it){
+    var o = document.createElement('option'); o.value = it.id; o.textContent = it.name + (it.sub && it.id.indexOf('c:')===0 ? ' (' + it.sub + ')' : ''); srcEl.appendChild(o);
+  });
+  srcEl.value = state.src;
+}
+function setNowInSource(){
+  var src = byId(state.src), p = partsAt(src.tz, Date.now());
+  dateStr = p.year + '-' + pad(p.month) + '-' + pad(p.day);
+  dateEl.value = dateStr;
+  minutes = p.hour*60 + p.minute;
+  timeEl.value = fmtMinutes(minutes, state.h24); timeEl.classList.remove('bad');
+}
+
+timeEl.addEventListener('input', function(){
+  var t = parseTime(timeEl.value);
+  timeEl.classList.toggle('bad', !t);
+  if(!t){ errEl.textContent = 'Could not read that time. Try 9am, 14:30 or noon.'; return; }
+  if(playing) setPlaying(false);
+  minutes = t[0]*60 + t[1]; update(false);
+});
+dateEl.addEventListener('input', function(){ if(dateEl.value){ dateStr = dateEl.value; update(true); } });
+sliderEl.addEventListener('input', function(){
+  if(playing) setPlaying(false);
+  var m = Math.round(parseInt(sliderEl.value,10)/5)*5; if(m > 1439) m = 1435;
+  sliderEl.value = m; minutes = m;
+  timeEl.value = fmtMinutes(m, state.h24); timeEl.classList.remove('bad');
+  update(true);
+});
+srcEl.addEventListener('change', function(){
+  state.src = srcEl.value; save(); update(true);
+  var it = byId(state.src); glideTo(it.lat, it.lon);
+});
+h24El.addEventListener('change', function(){ state.h24 = h24El.checked; save(); timeEl.value = fmtMinutes(minutes, state.h24); update(true); });
+$('now').addEventListener('click', function(){ if(playing) setPlaying(false); setNowInSource(); update(false); });
+playBtn.addEventListener('click', function(){ setPlaying(!playing); });
+$('reset').addEventListener('click', function(){
+  state.items = CORE.slice(); state.src = 'utc'; save(); buildSrc(); setNowInSource(); update(false); glideTo(20, 0);
+});
+$('copy').addEventListener('click', function(){
+  var btn = $('copy'); if(!lastText) return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(lastText).then(function(){ btn.textContent='Copied'; setTimeout(function(){btn.textContent='Copy as text';},1200); }, function(){});
+  }
+});
+listEl.addEventListener('click', function(e){
+  var rm = e.target.closest ? e.target.closest('[data-remove]') : null;
+  if(rm){
+    var id = rm.dataset.remove;
+    state.items = state.items.filter(function(i){return i.id!==id;});
+    save(); buildSrc(); update(true); e.stopPropagation(); return;
+  }
+  var row = e.target.closest ? e.target.closest('.row') : null;
+  if(row){ var it = byId(row.dataset.id); if(it){ glideTo(it.lat, it.lon); } }
+});
+listEl.addEventListener('keydown', function(e){
+  if((e.key==='Enter' || e.key===' ') && e.target.classList && e.target.classList.contains('row')){
+    e.preventDefault(); var it = byId(e.target.dataset.id); if(it) glideTo(it.lat, it.lon);
+  }
+});
+
+// ---------- search ----------
+function norm(s){ return s.toLowerCase().normalize ? s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'') : s.toLowerCase(); }
+var results = [], active = -1, ctrl = null, timer = null;
+function localMatches(q){
+  var n = norm(q), out = [];
+  CITIES.forEach(function(c){
+    var nm = norm(c[0]);
+    if(nm.indexOf(n) === 0) out.push({rank:0, c:c}); else if(nm.indexOf(n) > 0 || norm(c[1]).indexOf(n) === 0) out.push({rank:1, c:c});
+  });
+  out.sort(function(a,b){return a.rank-b.rank;});
+  return out.slice(0,6).map(function(o){
+    return {name:o.c[0], sub:o.c[1], lat:o.c[2], lon:o.c[3], tz:o.c[4]};
+  });
+}
+function showResults(list, note){
+  results = list; active = list.length ? 0 : -1;
+  resEl.innerHTML = '';
+  list.forEach(function(r,i){
+    var li = document.createElement('li'); li.setAttribute('role','option'); li.dataset.i = i;
+    if(i===active) li.className = 'on';
+    var a = document.createElement('span'); a.textContent = r.name;
+    var b = document.createElement('small'); b.textContent = r.sub + ' · ' + r.tz.replace(/_/g,' ');
+    li.appendChild(a); li.appendChild(b); resEl.appendChild(li);
+  });
+  if(note){ var n = document.createElement('li'); n.className = 'note'; n.textContent = note; resEl.appendChild(n); }
+  resEl.hidden = !(list.length || note);
+  qEl.setAttribute('aria-expanded', String(!resEl.hidden));
+}
+function mark(){ [].forEach.call(resEl.querySelectorAll('li[data-i]'), function(li){ li.classList.toggle('on', +li.dataset.i === active); }); }
+function addPlace(r){
+  var id = 'c:' + r.name + '|' + r.tz + '|' + r.lat.toFixed(2);
+  var existing = byId(id) || state.items.filter(function(i){return i.tz===r.tz && Math.abs(i.lat-r.lat)<0.3 && Math.abs(i.lon-r.lon)<0.3;})[0];
+  if(existing){ id = existing.id; }
+  else{ state.items.push({id:id, name:r.name, sub:r.sub, tz:r.tz, lat:r.lat, lon:r.lon}); save(); buildSrc(); }
+  flashId = id; update(true); glideTo(r.lat, r.lon);
+  setTimeout(function(){ flashId = null; }, 1500);
+  qEl.value = ''; showResults([], '');
+}
+function search(q){
+  var local = localMatches(q);
+  showResults(local, q.length>=2 ? 'Searching more places...' : '');
+  if(q.length < 2) return;
+  if(ctrl) ctrl.abort();
+  ctrl = window.AbortController ? new AbortController() : null;
+  var url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(q) + '&count=8&language=en&format=json';
+  fetch(url, ctrl ? {signal: ctrl.signal} : {}).then(function(r){ return r.json(); }).then(function(j){
+    var seen = {}, merged = [];
+    local.forEach(function(l){ seen[norm(l.name)+'|'+norm(l.sub)] = 1; merged.push(l); });
+    (j.results || []).forEach(function(r){
+      if(!r.timezone || typeof r.latitude!=='number') return;
+      var sub = [r.admin1, r.country].filter(Boolean).join(', ');
+      var key = norm(r.name)+'|'+norm(r.country||'');
+      if(seen[key] || seen[norm(r.name)+'|'+norm(r.country||'')]) return;
+      seen[key] = 1;
+      merged.push({name:r.name, sub:sub, lat:r.latitude, lon:r.longitude, tz:r.timezone});
+    });
+    if(qEl.value.trim() === q) showResults(merged.slice(0,10), merged.length ? '' : 'No places found.');
+  }).catch(function(err){
+    if(err && err.name === 'AbortError') return;
+    if(qEl.value.trim() === q) showResults(local, local.length ? 'Offline: showing built in cities only.' : 'Could not reach the place search. Built in cities only.');
+  });
+}
+qEl.addEventListener('input', function(){
+  var q = qEl.value.trim(); clearTimeout(timer);
+  if(!q){ showResults([], ''); return; }
+  showResults(localMatches(q), '');
+  timer = setTimeout(function(){ search(q); }, 250);
+});
+qEl.addEventListener('keydown', function(e){
+  if(e.key==='ArrowDown'){ e.preventDefault(); if(results.length){ active = (active+1)%results.length; mark(); } }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); if(results.length){ active = (active-1+results.length)%results.length; mark(); } }
+  else if(e.key==='Enter'){ e.preventDefault(); if(active>=0 && results[active]) addPlace(results[active]); }
+  else if(e.key==='Escape'){ showResults([], ''); }
+});
+resEl.addEventListener('mousedown', function(e){
+  var li = e.target.closest ? e.target.closest('li[data-i]') : null;
+  if(li){ e.preventDefault(); addPlace(results[+li.dataset.i]); }
+});
+document.addEventListener('click', function(e){ if(!e.target.closest('.search')) showResults([], ''); });
+
+// ---------- init ----------
+load();
+h24El.checked = state.h24;
+buildSrc();
+setNowInSource();
+resize();
+var s0 = byId(state.src); lat0 = Math.max(-40, Math.min(50, s0.lat*0.6))*D2R; lon0 = s0.lon*D2R;
+update(false);
+requestAnimationFrame(loop);
 })();
 </script>
 </body>
